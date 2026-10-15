@@ -568,34 +568,72 @@ Mercatini di Spinone al Lago`;
     } catch (err) { erroreInv(err.message); }
   };
 
+  let fermato = false;
   async function inviaLista(lista, { registra = true } = {}) {
     const log = $("#iLog"), bar = $("#iBar");
     $("#iProg").hidden = false; log.innerHTML = ""; bar.style.width = "0";
     $("#iErr").classList.remove("show");
     ["#iSend", "#iTest", "#iClose"].forEach((s) => ($(s).disabled = true));
-    let ok = 0, ko = 0;
+    // Invio lento e regolare per non far scattare i limiti di Gmail:
+    // blocchi da 6 email (una sola connessione/login per blocco) e pausa tra un blocco e l'altro.
+    const BLOCCO = 6, PAUSA_MS = 1000, PAUSE_LIMITE = [3, 3, 3]; // secondi di attesa se Gmail frena
+    const stato = (t) => { $("#iStato").textContent = t; };
+    const attendi = async (sec, msg) => {
+      for (let s = sec; s > 0 && !fermato; s--) { stato(`${msg} · riprendo tra ${s >= 60 ? Math.ceil(s / 60) + " min" : s + " s"}`); await new Promise((r) => setTimeout(r, 1000)); }
+    };
+    let ok = 0, ko = 0, tentativiLimite = 0;
+    fermato = false;
+    $("#iStop").hidden = false;
+    const coda = [...lista];
+    const totale = coda.length;
     try {
-      for (let i = 0; i < lista.length; i += 5) {
-        const blocco = lista.slice(i, i + 5);
-        let ris;
+      while (coda.length && !fermato) {
+        const blocco = coda.slice(0, BLOCCO);
+        stato(`Invio in corso… ${ok} di ${totale}`);
+        let res;
         try {
-          ris = (await api("/api/admin/invito", { method: "POST", body: JSON.stringify({ ...msgInv(), destinatari: blocco, prova: !registra }) })).risultati;
+          res = await api("/api/admin/invito", { method: "POST", body: JSON.stringify({ ...msgInv(), destinatari: blocco, prova: !registra }) });
         } catch (err) {
-          ris = blocco.map((d) => ({ email: d.email, ok: false, errore: err.message }));
+          res = { bloccato: true, risultati: blocco.map((d) => ({ email: d.email, ok: false, rinviato: true, errore: err.message })) };
         }
-        for (const r of ris) {
-          r.ok ? ok++ : ko++;
-          if (r.ok && registra) registroInviti[r.email] = { ultimo: new Date().toISOString() };
-          log.insertAdjacentHTML("afterbegin", r.ok ? `<div>✓ ${esc(r.email)}</div>` : `<div class="ko">✗ ${esc(r.email)} – ${esc(r.errore)}</div>`);
+        for (const r of res.risultati) {
+          if (r.ok) {
+            ok++;
+            coda.splice(coda.findIndex((d) => d.email === r.email), 1);
+            if (registra) registroInviti[r.email] = { ultimo: new Date().toISOString() };
+            log.insertAdjacentHTML("afterbegin", `<div>✓ ${esc(r.email)}</div>`);
+          } else if (!r.rinviato) {
+            ko++;
+            coda.splice(coda.findIndex((d) => d.email === r.email), 1);
+            log.insertAdjacentHTML("afterbegin", `<div class="ko">✗ ${esc(r.email)} – ${esc(r.errore)}</div>`);
+          }
         }
-        bar.style.width = Math.round(((i + blocco.length) / lista.length) * 100) + "%";
+        bar.style.width = Math.round(((totale - coda.length) / totale) * 100) + "%";
+        if (!coda.length) break;
+        if (res.bloccato) {
+          if (tentativiLimite >= PAUSE_LIMITE.length) {
+            log.insertAdjacentHTML("afterbegin", `<div class="ko">Gmail continua a chiedere di rallentare: invio sospeso. Riprova tra qualche ora (o domani): chi ha già ricevuto l'invito verrà saltato.</div>`);
+            break;
+          }
+          const sec = PAUSE_LIMITE[tentativiLimite++];
+          log.insertAdjacentHTML("afterbegin", `<div style="color:var(--orange);font-weight:700">⏸ Gmail chiede una pausa: attendo ${Math.round(sec / 60)} minuti e riprendo da solo.</div>`);
+          await attendi(sec, "In pausa per Gmail");
+        } else {
+          tentativiLimite = 0;
+          await attendi(PAUSA_MS / 1000, `Inviate ${ok} di ${totale}`);
+        }
       }
     } finally {
       ["#iSend", "#iTest", "#iClose"].forEach((s) => ($(s).disabled = false));
+      $("#iStop").hidden = true;
     }
-    log.insertAdjacentHTML("afterbegin", `<div style="font-weight:800;color:var(--maroon)">Finito: ${ok} inviate${ko ? `, ${ko} non riuscite` : ""}.</div>`);
+    stato("");
+    const rimasti = coda.length;
+    log.insertAdjacentHTML("afterbegin", `<div style="font-weight:800;color:var(--maroon)">${fermato ? "Interrotto" : "Finito"}: ${ok} inviate${ko ? `, ${ko} non riuscite` : ""}${rimasti ? `, ${rimasti} da inviare (premi di nuovo "Invia" per continuare)` : ""}.</div>`);
     calcolaDestinatari();
   }
+
+  $("#iStop").onclick = () => { fermato = true; $("#iStato").textContent = "Mi fermo dopo il blocco in corso…"; };
 
   $("#iTest").onclick = async () => {
     const me = prompt("A quale indirizzo invio la prova?", "");

@@ -77,6 +77,7 @@
   .inv-sum small { display: block; font-weight: 400; color: var(--muted); }
   .progress { height: 12px; background: #e6d4a6; border-radius: 99px; overflow: hidden; margin: 6px 0 10px; }
   .progress div { height: 100%; width: 0; background: var(--olive); transition: width .3s; }
+  .inv-stato { font-size: 14px; font-weight: 700; color: var(--olive); min-height: 20px; margin-bottom: 4px; }
   .inv-log { font-size: 13px; max-height: 140px; overflow: auto; color: var(--muted); }
   .inv-log .ko { color: var(--red); font-weight: 700; }
   .conf-pay { border-left-color: var(--gold); }
@@ -247,13 +248,15 @@
 
     <div class="inv-step">
       <div class="conf-lbl">3 · Invio</div>
-      <p class="hint">Le email partono una alla volta da <strong>mercatinispinone@gmail.com</strong>, ognuna con un solo destinatario (nessuno vede gli altri indirizzi). Tieni aperta la pagina fino alla fine.</p>
+      <p class="hint">Le email partono da <strong>mercatinispinone@gmail.com</strong>, ognuna con un solo destinatario (nessuno vede gli altri indirizzi). Per non far scattare i limiti di Gmail l'invio è volutamente lento (circa 6 email ogni 15 secondi, ~15 minuti per 350 indirizzi) e si mette in pausa da solo se Gmail lo chiede. Tieni aperta la pagina fino alla fine.</p>
       <div class="progress" id="iProg" hidden><div id="iBar"></div></div>
+      <div class="inv-stato" id="iStato"></div>
       <div class="inv-log" id="iLog"></div>
       <div class="conf-err" id="iErr"></div>
       <div class="dlg-actions">
         <button class="btn small ghost" id="iTest" type="button">Invia prova a me</button>
-        <button class="btn small" id="iSend" type="button">📣 Invia a tutti</button>
+        <span style="display:flex;gap:8px"><button class="btn small danger" id="iStop" type="button" hidden>■ Ferma</button>
+        <button class="btn small" id="iSend" type="button">📣 Invia a tutti</button></span>
       </div>
     </div>
   </div>

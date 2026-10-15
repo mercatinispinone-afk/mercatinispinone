@@ -9,7 +9,9 @@ import { costruisciInvito, inviaInvito } from "../lib/mailer.mjs";
  *       max 8 destinatari per chiamata: il browser invia a blocchi e mostra l'avanzamento
  */
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
-const MAX_PER_CHIAMATA = 8;
+const MAX_PER_CHIAMATA = 6;
+// Errori con cui Gmail chiede di rallentare (troppi login / troppi messaggi)
+const RE_LIMITE = /\b(454|421|550[ -]5\.4\.5|4\.7\.0)\b|too many|rate limit|daily user sending limit|try again later/i;
 const pausa = (ms) => new Promise((r) => setTimeout(r, ms));
 
 export default async (req) => {
@@ -39,24 +41,35 @@ export default async (req) => {
   if (dest.length > MAX_PER_CHIAMATA) return json({ error: `Massimo ${MAX_PER_CHIAMATA} destinatari per invio` }, 400);
 
   const risultati = [];
+  let bloccato = false;
   for (const d of dest) {
+    if (bloccato) {
+      // Gmail ha chiesto una pausa: non insistiamo, il browser riproverà più tardi
+      risultati.push({ email: d.email, ok: false, rinviato: true, errore: "in attesa (pausa richiesta da Gmail)" });
+      continue;
+    }
     try {
       await inviaInvito(d, { oggetto, testo }, siteUrl);
       risultati.push({ email: d.email, ok: true });
     } catch (e) {
       console.error("Invito non inviato a", d.email, e.message);
-      risultati.push({ email: d.email, ok: false, errore: e.message });
+      if (RE_LIMITE.test(e.message)) {
+        bloccato = true;
+        risultati.push({ email: d.email, ok: false, rinviato: true, errore: "in attesa (pausa richiesta da Gmail)" });
+      } else {
+        risultati.push({ email: d.email, ok: false, errore: e.message });
+      }
     }
-    await pausa(250); // un piccolo intervallo per non stressare il server SMTP
+    await pausa(300);
   }
 
-  if (body.prova) return json({ ok: true, risultati });
+  if (body.prova) return json({ ok: true, bloccato, risultati });
   const reg = (await store.get("registro", { type: "json" })) || {};
   const ora = new Date().toISOString();
   for (const r of risultati) if (r.ok) reg[r.email] = { ultimo: ora, volte: (reg[r.email]?.volte || 0) + 1 };
   await store.setJSON("registro", reg);
 
-  return json({ ok: true, risultati });
+  return json({ ok: true, bloccato, risultati });
 };
 
 export const config = { path: "/api/admin/invito" };
