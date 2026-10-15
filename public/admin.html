@@ -36,7 +36,10 @@
   .t1 { background: #e7e5c6; color: #4a4920; } .t2 { background: #fde2bf; color: #7a4510; } .t3 { background: #f6d0d3; color: #7d1a24; }
   .tg { background: #efe2c2; color: var(--maroon); }
   select.stato { font: inherit; font-size: 13px; padding: 4px 6px; border-radius: 99px; border: 2px solid var(--line); width: auto; font-weight: 700; }
-  select.stato.in_attesa { background: #fff6d6; } select.stato.accettato { background: #dfeccc; color: #33501a; } select.stato.rifiutato { background: #f7d6d6; color: #8a1f22; }
+  select.stato.in_attesa { background: #fff6d6; } select.stato.accettato { background: #dfeccc; color: #33501a; } select.stato.rifiutato { background: #f7d6d6; color: #8a1f22; } select.stato.confermato { background: #4f6b2c; color: #fff; }
+  .btn-pay { margin-top: 4px; font: inherit; font-size: 12px; font-weight: 800; border: 2px solid var(--olive); color: var(--olive); background: #fff; border-radius: 99px; padding: 1px 9px; cursor: pointer; white-space: nowrap; }
+  .btn-pay:hover { background: var(--olive); color: #fff; }
+  .tag.paid { background: #4f6b2c; color: #fff; }
   .empty { padding: 40px; text-align: center; color: var(--muted); }
   dialog { border: 0; border-radius: var(--radius); padding: 0; max-width: 760px; width: calc(100% - 32px); background: var(--paper); color: var(--ink); }
   dialog::backdrop { background: rgba(58,26,28,.55); }
@@ -66,6 +69,11 @@
   .conf-err.show { display: block; }
   .conf iframe { width: 100%; height: 520px; border: 0; border-radius: var(--radius); margin-top: 12px; background: #f7e9c6; }
   .conf-no { border-left-color: var(--red); }
+  [hidden] { display: none !important; }
+  .conf-pay { border-left-color: var(--gold); }
+  .conf-pay.done { background: #e3ecd2; border-left-color: #4f6b2c; }
+  .conf-grid3 { grid-template-columns: 1fr 1fr 1fr; }
+  .conf select, .conf input[type=date] { width: 100%; font: inherit; padding: 8px 10px; border: 2px solid var(--line); border-radius: var(--radius); background: #fff; }
   .tag.no { background: #f7d6d6; color: #8a1f22; }
   .tag.ok { background: #dfeccc; color: #33501a; }
   @media (max-width: 640px) { .conf-grid { grid-template-columns: 1fr; } }
@@ -100,7 +108,7 @@
       <input type="search" id="q" placeholder="Cerca nome, email, telefono, merce…">
       <select id="fTipo"><option value="">Tutti i tipi</option><option value="1">Tipo 1 · non alimentari</option><option value="2">Tipo 2 · alimentari confezionati</option><option value="3">Tipo 3 · consumo in loco</option></select>
       <select id="fGiorno"><option value="">Tutti i giorni</option><option value="sab">Sabato 5</option><option value="dom">Domenica 6</option><option value="both">Entrambi</option></select>
-      <select id="fStato"><option value="">Tutti gli stati</option><option value="in_attesa">In attesa</option><option value="accettato">Accettati</option><option value="rifiutato">Rifiutati</option></select>
+      <select id="fStato"><option value="">Tutti gli stati</option><option value="in_attesa">In attesa</option><option value="accettato">Pre-confermati (da pagare)</option><option value="confermato">Confermati (pagato)</option><option value="rifiutato">Rifiutati</option></select>
       <span class="spacer"></span>
       <button class="btn small" id="csv">⬇ Esporta CSV</button>
     </div>
@@ -148,6 +156,30 @@
         </span>
       </div>
       <iframe id="cFrame" title="Anteprima email" hidden></iframe>
+    </div>
+
+    <div class="conf conf-pay" id="pag">
+      <h3>Pagamento e conferma definitiva</h3>
+      <p class="conf-stato" id="pStato"></p>
+      <div class="conf-grid conf-grid3">
+        <div>
+          <label class="conf-lbl" for="pImporto">Importo ricevuto (€)</label>
+          <input type="number" id="pImporto" min="0" step="1" inputmode="decimal">
+        </div>
+        <div>
+          <label class="conf-lbl" for="pMetodo">Metodo</label>
+          <select id="pMetodo"><option>Bonifico</option><option>PayPal / carta</option><option>Contanti</option><option>Altro</option></select>
+        </div>
+        <div>
+          <label class="conf-lbl" for="pData">Data</label>
+          <input type="date" id="pData">
+        </div>
+      </div>
+      <div class="conf-err" id="pErr"></div>
+      <div class="dlg-actions" style="margin-top:10px">
+        <button class="btn small ghost" id="pAnnulla" type="button">Annulla pagamento</button>
+        <button class="btn small secondary" id="pSave" type="button">✓ Pagamento ricevuto · conferma postazione</button>
+      </div>
     </div>
 
     <div class="conf conf-no" id="rif">

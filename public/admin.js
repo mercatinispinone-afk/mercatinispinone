@@ -14,7 +14,7 @@
     "3": "3) Alimentari per consumo diretto in loco",
   };
   const GIORNI = { sab: "Sab 5", dom: "Dom 6" };
-  const STATI = { in_attesa: "In attesa", accettato: "Accettato", rifiutato: "Rifiutato" };
+  const STATI = { in_attesa: "In attesa", accettato: "Pre-confermato", confermato: "Confermato ✓", rifiutato: "Rifiutato" };
   const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
   const euro = (n) => "€ " + Number(n || 0).toFixed(2).replace(".", ",");
   const data = (iso) => new Date(iso).toLocaleString("it-IT", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" });
@@ -91,13 +91,16 @@
     const dom = dati.filter((r) => r.giorni.includes("dom")).length;
     const per = (t) => dati.filter((r) => r.tipo === t).length;
     const acc = dati.filter((r) => r.stato === "accettato");
+    const conf = dati.filter((r) => r.stato === "confermato");
     const att = dati.filter((r) => r.stato === "in_attesa").length;
+    const incassato = dati.reduce((s, r) => s + (r.pagamento?.importo || 0), 0);
+    const daIncassare = acc.reduce((s, r) => s + (r.quotaConfermata ?? r.quotaStimata), 0);
     $("#stats").innerHTML = `
-      <div class="stat"><div class="k">Iscritti</div><div class="v">${tot}</div><div class="s">${att} in attesa · ${acc.length} accettati</div></div>
+      <div class="stat"><div class="k">Iscritti</div><div class="v">${tot}</div><div class="s">${att} in attesa · ${acc.length} pre-conf. · ${conf.length} confermati</div></div>
       <div class="stat"><div class="k">Sabato 5</div><div class="v">${sab}</div><div class="s">espositori</div></div>
       <div class="stat"><div class="k">Domenica 6</div><div class="v">${dom}</div><div class="s">espositori</div></div>
       <div class="stat"><div class="k">Per tipo</div><div class="v" style="font-size:22px">${per("1")} · ${per("2")} · ${per("3")}</div><div class="s">tipo 1 · 2 · 3</div></div>
-      <div class="stat"><div class="k">Quote accettati</div><div class="v" style="font-size:24px">${euro(acc.reduce((s, r) => s + (r.quotaConfermata ?? r.quotaStimata), 0))}</div><div class="s">stima su ${euro(dati.reduce((s, r) => s + r.quotaStimata, 0))} totali</div></div>`;
+      <div class="stat"><div class="k">Incassato</div><div class="v" style="font-size:24px">${euro(incassato)}</div><div class="s">${conf.length} ${conf.length === 1 ? "pagamento" : "pagamenti"} · da incassare ${euro(daIncassare)}</div></div>`;
 
     const lista = filtrati();
     $("#empty").hidden = lista.length > 0;
@@ -112,7 +115,7 @@
         <td>${r.giorni.map((g) => `<span class="tag tg">${GIORNI[g]}</span>`).join("")}</td>
         <td class="sub">Gazebo: ${esc(r.gazebo)}<br>Corrente: ${esc(r.corrente)}<br>Asfalto: ${esc(r.asfalto)}</td>
         <td><strong>${euro(r.quotaStimata)}</strong></td>
-        <td><select class="stato ${r.stato}" data-stato>${Object.entries(STATI).map(([k, v]) => `<option value="${k}" ${k === r.stato ? "selected" : ""}>${v}</option>`).join("")}</select>${r.stato === "accettato" && r.confermaInviata ? `<div><span class="tag ok" title="Pre-conferma inviata">✉ ${new Date(r.confermaInviata).toLocaleDateString("it-IT")}</span></div>` : ""}${r.stato === "rifiutato" && r.rifiutoInviato ? `<div><span class="tag no" title="Email di non selezione inviata">✉ ${new Date(r.rifiutoInviato).toLocaleDateString("it-IT")}</span></div>` : ""}</td>
+        <td><select class="stato ${r.stato}" data-stato>${Object.entries(STATI).map(([k, v]) => `<option value="${k}" ${k === r.stato ? "selected" : ""}>${v}</option>`).join("")}</select>${r.stato === "accettato" ? `<div>${r.confermaInviata ? `<span class="tag ok" title="Pre-conferma inviata">✉ ${new Date(r.confermaInviata).toLocaleDateString("it-IT")}</span>` : ""}<button class="btn-pay" data-pay title="Registra il pagamento e conferma la postazione">€ Pagato?</button></div>` : ""}${r.stato === "confermato" && r.pagamento ? `<div><span class="tag paid" title="${esc(r.pagamento.metodo)}">€ ${esc(String(r.pagamento.importo))} · ${new Date(r.pagamento.data).toLocaleDateString("it-IT")}</span></div>` : ""}${r.stato === "rifiutato" && r.rifiutoInviato ? `<div><span class="tag no" title="Email di non selezione inviata">✉ ${new Date(r.rifiutoInviato).toLocaleDateString("it-IT")}</span></div>` : ""}</td>
         <td><button class="btn small ghost" data-open>Dettagli</button></td>
       </tr>`
       )
@@ -123,7 +126,7 @@
     if (!e.target.matches("[data-stato]")) return;
     const id = e.target.closest("tr").dataset.id;
     const stato = e.target.value;
-    if (stato === "accettato" || stato === "rifiutato") {
+    if (stato === "accettato" || stato === "rifiutato" || stato === "confermato") {
       // Prima di cambiare stato apriamo il pannello della comunicazione (con o senza email)
       render();
       apri(id, stato);
@@ -137,6 +140,7 @@
   });
   $("#rows").addEventListener("click", (e) => {
     if (e.target.matches("[data-open]")) apri(e.target.closest("tr").dataset.id);
+    if (e.target.matches("[data-pay]")) apri(e.target.closest("tr").dataset.id, "confermato");
   });
 
   /* ---------- Dettaglio ---------- */
@@ -149,9 +153,17 @@
     corrente = r;
     preparaConferma(r);
     preparaRifiuto(r);
-    // Mostra il pannello pertinente: entrambi se si apre dai "Dettagli"
-    $("#conf").hidden = focus === "rifiutato";
-    $("#rif").hidden = focus === "accettato";
+    preparaPagamento(r);
+    // Mostra solo il pannello pertinente; dai "Dettagli" quelli utili per lo stato attuale
+    if (focus) {
+      $("#conf").hidden = focus !== "accettato";
+      $("#rif").hidden = focus !== "rifiutato";
+      $("#pag").hidden = focus !== "confermato";
+    } else {
+      $("#conf").hidden = r.stato === "confermato";
+      $("#rif").hidden = r.stato === "confermato";
+      $("#pag").hidden = !["accettato", "confermato"].includes(r.stato);
+    }
     $("#dTitle").textContent = `n. ${r.numero}${r.codice ? " · " + r.codice : ""} · ${r.nome} ${r.cognome}`;
     const righe = [
       ["Ricevuta il", data(r.creato)],
@@ -167,13 +179,14 @@
       ["Vicino a", r.vicinoA || "—"],
       ["Quota indicativa", euro(r.quotaStimata)],
       ["Stato", STATI[r.stato]],
+      ["Pagamento", r.pagamento ? `${euro(r.pagamento.importo)} · ${r.pagamento.metodo} · ${new Date(r.pagamento.data).toLocaleDateString("it-IT")}` : "—"],
     ];
     $("#dList").innerHTML = righe.map(([k, v]) => `<dt>${k}</dt><dd>${esc(v)}</dd>`).join("");
     $("#dNote").value = r.note || "";
     const gal = $("#dFoto");
     gal.innerHTML = "";
     dlg.showModal();
-    if (focus) $(focus === "rifiutato" ? "#rif" : "#conf").scrollIntoView({ block: "start" });
+    if (focus) $({ rifiutato: "#rif", confermato: "#pag" }[focus] || "#conf").scrollIntoView({ block: "start" });
     for (const key of r.foto || []) {
       try {
         const res = await fetch(`/api/admin/foto?key=${encodeURIComponent(key)}`, { headers: { "x-admin-password": pwd } });
@@ -205,7 +218,7 @@
       st.className = "conf-stato sent";
       $("#cSend").textContent = "✉ Reinvia pre-conferma";
     } else {
-      st.textContent = "Scegli i giorni assegnati e la quota: l'espositore riceverà l'email con le istruzioni di pagamento e verrà segnato come accettato.";
+      st.textContent = "Scegli i giorni assegnati e la quota: l'espositore riceverà l'email con le istruzioni di pagamento e verrà segnato come pre-confermato (da pagare).";
       st.className = "conf-stato";
       $("#cSend").textContent = "✉ Invia pre-conferma";
     }
@@ -270,6 +283,53 @@
       Object.assign(corrente, iscritto);
       dlg.close(); render();
     } catch (err) { erroreConf(err.message); }
+  };
+
+  /* ---------- Pagamento / conferma definitiva ---------- */
+  const oggi = () => new Date().toISOString().slice(0, 10);
+  function preparaPagamento(r) {
+    const p = r.pagamento;
+    $("#pImporto").value = p?.importo ?? r.quotaConfermata ?? r.quotaStimata;
+    $("#pMetodo").value = p?.metodo || "Bonifico";
+    $("#pData").value = p?.data || oggi();
+    $("#pErr").classList.remove("show");
+    const st = $("#pStato");
+    $("#pag").classList.toggle("done", !!p);
+    $("#pAnnulla").hidden = !p;
+    if (p) {
+      st.textContent = `✓ Postazione confermata: ricevuti ${euro(p.importo)} (${p.metodo}) il ${new Date(p.data).toLocaleDateString("it-IT")}.`;
+      st.className = "conf-stato sent";
+      $("#pSave").textContent = "✓ Aggiorna dati pagamento";
+    } else {
+      const dovuto = r.quotaConfermata != null ? `Quota richiesta nella pre-conferma: ${euro(r.quotaConfermata)}. ` : "";
+      st.textContent = dovuto + "Quando ricevi il pagamento registralo qui: la postazione diventa confermata in via definitiva.";
+      st.className = "conf-stato";
+      $("#pSave").textContent = "✓ Pagamento ricevuto · conferma postazione";
+    }
+  }
+  const errorePag = (msg) => { const b = $("#pErr"); b.textContent = msg; b.classList.add("show"); };
+  $("#pSave").onclick = async () => {
+    const importo = Number($("#pImporto").value);
+    if ($("#pImporto").value === "" || !(importo >= 0)) return errorePag("Inserisci l'importo ricevuto.");
+    if (corrente.quotaConfermata != null && importo < corrente.quotaConfermata &&
+        !confirm(`L'importo (${euro(importo)}) è inferiore alla quota richiesta (${euro(corrente.quotaConfermata)}). Confermare comunque?`)) return;
+    try {
+      const { iscritto } = await api(`/api/admin/iscritti?id=${encodeURIComponent(corrente.id)}`, {
+        method: "PATCH",
+        body: JSON.stringify({ stato: "confermato", pagamento: { importo, metodo: $("#pMetodo").value, data: $("#pData").value } }),
+      });
+      Object.assign(corrente, iscritto);
+      dlg.close(); render();
+    } catch (err) { errorePag(err.message); }
+  };
+  $("#pAnnulla").onclick = async () => {
+    if (!confirm("Annullare il pagamento registrato? L'espositore tornerà pre-confermato (da pagare).")) return;
+    try {
+      const { iscritto } = await api(`/api/admin/iscritti?id=${encodeURIComponent(corrente.id)}`, { method: "PATCH", body: JSON.stringify({ stato: "accettato", pagamento: null }) });
+      delete corrente.pagamento;
+      Object.assign(corrente, iscritto);
+      dlg.close(); render();
+    } catch (err) { errorePag(err.message); }
   };
 
   /* ---------- Non selezione ---------- */
@@ -361,6 +421,10 @@
       ["Giorni confermati", (r) => (r.giorniConfermati || []).map((g) => GIORNI[g]).join(" + ")],
       ["Quota confermata (€)", (r) => (r.quotaConfermata != null ? Number(r.quotaConfermata).toFixed(2).replace(".", ",") : "")],
       ["Pre-conferma inviata", (r) => (r.confermaInviata ? data(r.confermaInviata) : "")],
+      ["Pagato", (r) => (r.pagamento ? "Sì" : "No")],
+      ["Importo pagato (€)", (r) => (r.pagamento ? Number(r.pagamento.importo).toFixed(2).replace(".", ",") : "")],
+      ["Metodo pagamento", (r) => r.pagamento?.metodo || ""],
+      ["Data pagamento", (r) => (r.pagamento ? new Date(r.pagamento.data).toLocaleDateString("it-IT") : "")],
       ["Email non selezione inviata", (r) => (r.rifiutoInviato ? data(r.rifiutoInviato) : "")],
       ["Note interne", (r) => r.note],
     ];

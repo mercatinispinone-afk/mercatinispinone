@@ -1,11 +1,11 @@
-import { iscrizioniStore, fotoStore, json, isAdmin, STATI, GIORNI } from "../lib/shared.mjs";
+import { iscrizioniStore, fotoStore, json, isAdmin, STATI, GIORNI, METODI_PAGAMENTO } from "../lib/shared.mjs";
 import { costruisciPreconferma, inviaPreconferma, costruisciRifiuto, inviaRifiuto } from "../lib/mailer.mjs";
 
 /**
  * API area riservata (header x-admin-password obbligatorio)
  *  GET    /api/admin/iscritti            -> elenco completo
  *  GET    /api/admin/foto?key=<id>/<n>   -> immagine
- *  PATCH  /api/admin/iscritti?id=<id>    -> { stato, note }
+ *  PATCH  /api/admin/iscritti?id=<id>    -> { stato, note, pagamento: {importo, metodo, data} | null }
  *  DELETE /api/admin/iscritti?id=<id>    -> elimina iscrizione e foto
  *  POST   /api/admin/conferma?id=<id>     -> { giorni, quota, anteprima } invia email di pre-conferma
  *  POST   /api/admin/rifiuto?id=<id>      -> { messaggio, anteprima } invia email di non selezione
@@ -58,7 +58,7 @@ export default async (req) => {
       console.error("Errore invio pre-conferma:", e.message);
       return json({ error: "Email non inviata: " + e.message }, 502);
     }
-    rec.stato = "accettato";
+    if (rec.stato !== "confermato") rec.stato = "accettato";
     rec.giorniConfermati = giorni;
     rec.quotaConfermata = quota;
     rec.confermaInviata = new Date().toISOString();
@@ -92,6 +92,15 @@ export default async (req) => {
       rec.stato = body.stato;
     }
     if (typeof body.note === "string") rec.note = body.note.slice(0, 2000);
+    if (body.pagamento === null) {
+      delete rec.pagamento;
+    } else if (body.pagamento && typeof body.pagamento === "object") {
+      const importo = Number(body.pagamento.importo);
+      const metodo = METODI_PAGAMENTO.includes(body.pagamento.metodo) ? body.pagamento.metodo : "Altro";
+      const data = /^\d{4}-\d{2}-\d{2}$/.test(body.pagamento.data || "") ? body.pagamento.data : new Date().toISOString().slice(0, 10);
+      if (!Number.isFinite(importo) || importo < 0 || importo > 10000) return json({ error: "Importo non valido" }, 400);
+      rec.pagamento = { importo, metodo, data, registrato: new Date().toISOString() };
+    }
     rec.aggiornato = new Date().toISOString();
     await store.setJSON(key, rec);
     return json({ ok: true, iscritto: rec });

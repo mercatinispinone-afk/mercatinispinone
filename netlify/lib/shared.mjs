@@ -37,7 +37,9 @@ export function quotaSpazio(tipo, giorni) {
   return tipo === "3" ? 50 * n : n >= 2 ? 30 : 20;
 }
 
-export const STATI = ["in_attesa", "accettato", "rifiutato"];
+// accettato = pre-confermato (email inviata, in attesa di pagamento); confermato = pagamento ricevuto
+export const STATI = ["in_attesa", "accettato", "confermato", "rifiutato"];
+export const METODI_PAGAMENTO = ["Bonifico", "PayPal / carta", "Contanti", "Altro"];
 
 export const iscrizioniStore = () => getStore({ name: "iscrizioni", consistency: "strong" });
 export const fotoStore = () => getStore({ name: "foto-iscrizioni", consistency: "strong" });
