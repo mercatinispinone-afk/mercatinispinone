@@ -170,7 +170,7 @@
       if (!res.ok || !data.ok) throw new Error(data.error || "Si è verificato un errore. Riprova tra qualche minuto.");
       form.hidden = true;
       $("#intro").hidden = true;
-      $("#successNum").textContent = "Richiesta n. " + data.numero;
+      $("#successNum").textContent = "Codice richiesta: " + data.codice;
       if (data.emailInviata === false)
         $("#successMsg").textContent = "La richiesta è stata registrata, ma non siamo riusciti a inviarti l'email di riepilogo. Non preoccuparti: ti contatteremo noi.";
       $("#success").classList.add("show");

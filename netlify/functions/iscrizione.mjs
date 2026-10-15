@@ -1,4 +1,4 @@
-import { randomUUID } from "node:crypto";
+import { randomUUID, randomInt } from "node:crypto";
 import { iscrizioniStore, fotoStore, json, stimaQuota, GIORNI, TIPI } from "../lib/shared.mjs";
 import { inviaConfermaEspositore, inviaNotificaOrganizzatore } from "../lib/mailer.mjs";
 
@@ -6,6 +6,10 @@ const SI_NO = ["Sì", "No"];
 const MAX_FOTO = 5;
 const MAX_FOTO_BYTES = 1.8 * 1024 * 1024;
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+
+// Codice richiesta casuale (senza caratteri ambigui come 0/O, 1/I)
+const ALFABETO = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+const nuovoCodice = () => "NS-" + Array.from({ length: 5 }, () => ALFABETO[randomInt(ALFABETO.length)]).join("");
 
 const str = (v, max = 300) => (typeof v === "string" ? v.trim().slice(0, max) : "");
 
@@ -20,7 +24,7 @@ export default async (req, context) => {
   }
 
   // Honeypot anti-spam: campo nascosto che gli umani lasciano vuoto
-  if (body.sito_web) return json({ ok: true, numero: "—" });
+  if (body.sito_web) return json({ ok: true, codice: nuovoCodice() });
 
   const r = {
     nome: str(body.nome, 80),
@@ -87,7 +91,8 @@ export default async (req, context) => {
 
   const record = {
     id,
-    numero: String(meta.n).padStart(3, "0"),
+    numero: String(meta.n).padStart(3, "0"), // solo per uso interno (area admin)
+    codice: nuovoCodice(),
     creato: new Date().toISOString(),
     stato: "in_attesa",
     note: "",
@@ -115,7 +120,7 @@ export default async (req, context) => {
   }
   await store.setJSON(`iscritti/${id}`, record);
 
-  return json({ ok: true, numero: record.numero, emailInviata: record.emailInviata });
+  return json({ ok: true, codice: record.codice, emailInviata: record.emailInviata });
 };
 
 export const config = { path: "/api/iscrizione" };

@@ -65,7 +65,7 @@
         if (g === "both" && r.giorni.length < 2) return false;
         if (g && g !== "both" && !r.giorni.includes(g)) return false;
         if (q) {
-          const txt = [r.numero, r.nome, r.cognome, r.email, r.telefono, r.descrizione, r.vicinoA, r.note].join(" ").toLowerCase();
+          const txt = [r.numero, r.codice, r.nome, r.cognome, r.email, r.telefono, r.descrizione, r.vicinoA, r.note].join(" ").toLowerCase();
           if (!txt.includes(q)) return false;
         }
         return true;
@@ -104,7 +104,7 @@
     $("#rows").innerHTML = lista
       .map(
         (r) => `<tr data-id="${esc(r.id)}">
-        <td><strong>${esc(r.numero)}</strong></td>
+        <td><strong>${esc(r.numero)}</strong>${r.codice ? `<div class="sub">${esc(r.codice)}</div>` : ""}</td>
         <td class="sub">${data(r.creato)}</td>
         <td><strong>${esc(r.cognome)} ${esc(r.nome)}</strong>${r.giaPartecipato === "Sì" ? '<div class="sub">già partecipato</div>' : ""}${r.foto?.length ? `<div class="sub">📷 ${r.foto.length} foto</div>` : ""}</td>
         <td><a href="mailto:${esc(r.email)}">${esc(r.email)}</a><div class="sub"><a href="tel:${esc(r.telefono)}">${esc(r.telefono)}</a></div></td>
@@ -141,7 +141,7 @@
   async function apri(id) {
     const r = dati.find((x) => x.id === id);
     corrente = r;
-    $("#dTitle").textContent = `n. ${r.numero} · ${r.nome} ${r.cognome}`;
+    $("#dTitle").textContent = `n. ${r.numero}${r.codice ? " · " + r.codice : ""} · ${r.nome} ${r.cognome}`;
     const righe = [
       ["Ricevuta il", data(r.creato)],
       ["Email", r.email + (r.emailInviata ? "  ✓ conferma inviata" : "  ⚠ email di conferma NON inviata")],
@@ -196,6 +196,7 @@
   $("#csv").onclick = () => {
     const cols = [
       ["N.", (r) => r.numero],
+      ["Codice", (r) => r.codice || ""],
       ["Data iscrizione", (r) => data(r.creato)],
       ["Stato", (r) => STATI[r.stato]],
       ["Nome", (r) => r.nome],

@@ -64,7 +64,7 @@ export async function inviaConfermaEspositore(r) {
   const corpo = `<p>Ciao ${esc(r.nome)},</p>
 <p>abbiamo ricevuto la tua <strong>richiesta di partecipazione</strong> ai Mercatini di Natale di Spinone al Lago, ${EVENTO.date}.</p>
 <p>Ricorda che questa <strong>non è ancora una conferma</strong>: l'organizzazione valuterà le richieste in base alla tipologia merceologica e all'ordine di arrivo e ti scriverà via email sia in caso di accettazione sia di rifiuto. Insieme alla conferma riceverai le istruzioni per il pagamento della quota.</p>
-<p style="margin:18px 0 6px;font-weight:bold;color:#5b1f24">Riepilogo della tua richiesta (n. ${esc(r.numero)})</p>
+<p style="margin:18px 0 6px;font-weight:bold;color:#5b1f24">Riepilogo della tua richiesta (codice ${esc(r.codice)})</p>
 <table cellpadding="0" cellspacing="0" style="width:100%;border-collapse:collapse;background:#fbf1d8;border-radius:4px">${riepilogoRighe(r)}</table>
 <p style="font-size:13px;color:#6b4a3a;margin-top:14px">La quota indicata è una stima calcolata sulle tue scelte; l'importo definitivo ti verrà comunicato con la conferma.</p>
 <p>Per qualsiasi domanda puoi rispondere a questa email o scrivere a <a href="mailto:${EVENTO.contatto}" style="color:#a3222f">${EVENTO.contatto}</a>.</p>
@@ -81,7 +81,7 @@ export async function inviaConfermaEspositore(r) {
 export async function inviaNotificaOrganizzatore(r, siteUrl) {
   const to = process.env.ORGANIZER_EMAIL;
   if (!to) return null;
-  const corpo = `<p>Nuova iscrizione espositore ricevuta (n. ${esc(r.numero)}).</p>
+  const corpo = `<p>Nuova iscrizione espositore ricevuta (n. ${esc(r.numero)} · codice ${esc(r.codice)}).</p>
 <table cellpadding="0" cellspacing="0" style="width:100%;border-collapse:collapse;background:#fbf1d8">${riepilogoRighe(r)}</table>
 <p style="margin-top:16px"><a href="${esc(siteUrl)}/admin" style="background:#a3222f;color:#fff;padding:10px 16px;border-radius:4px;text-decoration:none;font-weight:bold">Apri l'area iscritti</a></p>`;
   return getTransporter().sendMail({
