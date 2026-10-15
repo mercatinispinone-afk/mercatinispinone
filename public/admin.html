@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Area iscritti · Natale a Spinone 2026</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Lilita+One&family=Nunito:wght@400;700;800&family=Oswald:wght@500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/style.css">
+<style>
+  .topbar { background: var(--maroon); color: var(--cream-2); }
+  .topbar .wrap { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 14px 16px; flex-wrap: wrap; }
+  .topbar h1 { font-family: var(--head); font-weight: 400; margin: 0; font-size: 26px; color: var(--cream-2); }
+  .topbar h1 span { color: var(--gold); }
+  .admin-wrap { max-width: 1280px; }
+  .login { max-width: 400px; margin: 60px auto; background: var(--paper); border-radius: var(--radius); padding: 26px; text-align: center; }
+  .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin: 20px 0; }
+  .stat { background: var(--paper); border-radius: var(--radius); padding: 12px 14px; border-top: 5px solid var(--olive); }
+  .stat:nth-child(2) { border-color: var(--red); } .stat:nth-child(3) { border-color: var(--orange); } .stat:nth-child(4) { border-color: var(--gold); } .stat:nth-child(5) { border-color: var(--maroon); }
+  .stat .k { font-family: var(--cond); text-transform: uppercase; font-size: 13px; letter-spacing: .05em; color: var(--muted); }
+  .stat .v { font-family: var(--head); font-size: 30px; color: var(--maroon); line-height: 1.1; }
+  .stat .s { font-size: 13px; color: var(--muted); }
+  .toolbar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 12px; }
+  .toolbar input, .toolbar select { width: auto; padding: 8px 10px; }
+  .toolbar input[type=search] { flex: 1 1 220px; font: inherit; border: 2px solid var(--line); border-radius: var(--radius); }
+  .toolbar .spacer { flex: 1; }
+  .table-wrap { background: var(--paper); border-radius: var(--radius); overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  th { text-align: left; font-family: var(--cond); text-transform: uppercase; letter-spacing: .04em; font-weight: 500; color: var(--cream-2); background: var(--olive); padding: 10px; white-space: nowrap; cursor: pointer; user-select: none; }
+  td { padding: 9px 10px; border-top: 1px solid var(--line); vertical-align: top; }
+  tr:hover td { background: #fff5dd; }
+  td .sub { color: var(--muted); font-size: 13px; }
+  .tag { display: inline-block; padding: 1px 8px; border-radius: 99px; font-size: 12px; font-weight: 800; margin: 1px 2px 1px 0; white-space: nowrap; }
+  .t1 { background: #e7e5c6; color: #4a4920; } .t2 { background: #fde2bf; color: #7a4510; } .t3 { background: #f6d0d3; color: #7d1a24; }
+  .tg { background: #efe2c2; color: var(--maroon); }
+  select.stato { font: inherit; font-size: 13px; padding: 4px 6px; border-radius: 99px; border: 2px solid var(--line); width: auto; font-weight: 700; }
+  select.stato.in_attesa { background: #fff6d6; } select.stato.accettato { background: #dfeccc; color: #33501a; } select.stato.rifiutato { background: #f7d6d6; color: #8a1f22; }
+  .empty { padding: 40px; text-align: center; color: var(--muted); }
+  dialog { border: 0; border-radius: var(--radius); padding: 0; max-width: 760px; width: calc(100% - 32px); background: var(--paper); color: var(--ink); }
+  dialog::backdrop { background: rgba(58,26,28,.55); }
+  .dlg-head { background: var(--maroon); color: var(--cream-2); padding: 14px 20px; display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+  .dlg-head h2 { color: var(--cream-2); margin: 0; font-size: 24px; }
+  .dlg-head button { background: none; border: 0; color: var(--cream-2); font-size: 28px; cursor: pointer; line-height: 1; }
+  .dlg-body { padding: 18px 20px; }
+  .dl { display: grid; grid-template-columns: 190px 1fr; gap: 6px 14px; font-size: 15px; }
+  .dl dt { color: var(--muted); font-weight: 700; }
+  .dl dd { margin: 0; white-space: pre-wrap; }
+  .gallery { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 8px; margin-top: 14px; }
+  .gallery a { aspect-ratio: 1; background: #eee; border-radius: var(--radius); overflow: hidden; display: block; }
+  .gallery img { width: 100%; height: 100%; object-fit: cover; }
+  .dlg-actions { display: flex; gap: 8px; flex-wrap: wrap; justify-content: space-between; margin-top: 16px; }
+  .btn.danger { background: transparent; color: var(--red); border: 2px solid var(--red); }
+  .btn.danger:hover { background: var(--red); color: #fff; }
+  @media (max-width: 640px) { .dl { grid-template-columns: 1fr; } .dl dt { margin-top: 6px; } }
+</style>
+</head>
+<body>
+<div class="topbar">
+  <div class="wrap admin-wrap">
+    <h1>Natale a Spinone · <span>area iscritti</span></h1>
+    <div id="topActions" hidden>
+      <button class="btn small secondary" id="reload">Aggiorna</button>
+      <button class="btn small" id="logout" style="background:transparent;border:2px solid var(--cream-2)">Esci</button>
+    </div>
+  </div>
+</div>
+<div class="crosses" style="margin-top:10px"></div>
+
+<main class="wrap admin-wrap">
+  <form class="login" id="login">
+    <h2>Accesso organizzatori</h2>
+    <p class="hint">Inserisci la password impostata su Netlify (variabile ADMIN_PASSWORD).</p>
+    <input type="password" id="pwd" placeholder="Password" autocomplete="current-password" style="width:100%;font:inherit;padding:11px 12px;border:2px solid var(--line);border-radius:var(--radius)">
+    <div class="form-error" id="loginErr"></div>
+    <div style="margin-top:16px"><button class="btn" type="submit">Entra</button></div>
+  </form>
+
+  <div id="app" hidden>
+    <div class="stats" id="stats"></div>
+
+    <div class="toolbar">
+      <input type="search" id="q" placeholder="Cerca nome, email, telefono, merce…">
+      <select id="fTipo"><option value="">Tutti i tipi</option><option value="1">Tipo 1 · non alimentari</option><option value="2">Tipo 2 · alimentari confezionati</option><option value="3">Tipo 3 · consumo in loco</option></select>
+      <select id="fGiorno"><option value="">Tutti i giorni</option><option value="sab">Sabato 5</option><option value="dom">Domenica 6</option><option value="both">Entrambi</option></select>
+      <select id="fStato"><option value="">Tutti gli stati</option><option value="in_attesa">In attesa</option><option value="accettato">Accettati</option><option value="rifiutato">Rifiutati</option></select>
+      <span class="spacer"></span>
+      <button class="btn small" id="csv">⬇ Esporta CSV</button>
+    </div>
+
+    <div class="table-wrap">
+      <table>
+        <thead><tr>
+          <th data-sort="numero">N.</th><th data-sort="creato">Data</th><th data-sort="cognome">Espositore</th><th>Contatti</th>
+          <th data-sort="tipo">Merce</th><th>Giorni</th><th>Postazione</th><th data-sort="quotaStimata">Quota</th><th data-sort="stato">Stato</th><th></th>
+        </tr></thead>
+        <tbody id="rows"></tbody>
+      </table>
+      <div class="empty" id="empty" hidden>Nessun iscritto corrisponde ai filtri.</div>
+    </div>
+    <p class="hint" style="margin-top:10px">Il CSV esporta gli iscritti visibili con i filtri attuali (separatore ";" per Excel).</p>
+  </div>
+</main>
+
+<dialog id="dlg">
+  <div class="dlg-head"><h2 id="dTitle"></h2><button type="button" id="dClose" aria-label="Chiudi">×</button></div>
+  <div class="dlg-body">
+    <dl class="dl" id="dList"></dl>
+    <div class="gallery" id="dFoto"></div>
+    <div class="field" style="margin-top:16px">
+      <label for="dNote">Note interne (postazione assegnata, pagamento…)</label>
+      <textarea id="dNote" style="min-height:70px"></textarea>
+    </div>
+    <div class="dlg-actions">
+      <button class="btn small danger" id="dDel">Elimina iscrizione</button>
+      <button class="btn small secondary" id="dSave">Salva note</button>
+    </div>
+  </div>
+</dialog>
+
+<script src="/admin.js"></script>
+</body>
+</html>

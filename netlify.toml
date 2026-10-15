@@ -1,0 +1,25 @@
+[build]
+  publish = "public"
+  functions = "netlify/functions"
+  command = "echo 'Nessuna build necessaria'"
+
+[functions]
+  node_bundler = "esbuild"
+  external_node_modules = ["nodemailer"]
+
+# Pagina admin: non indicizzare
+[[headers]]
+  for = "/admin*"
+  [headers.values]
+    X-Robots-Tag = "noindex, nofollow"
+    Cache-Control = "no-store"
+
+[[redirects]]
+  from = "/admin"
+  to = "/admin.html"
+  status = 200
+
+[[redirects]]
+  from = "/regolamento"
+  to = "/regolamento.html"
+  status = 200
