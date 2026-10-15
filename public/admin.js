@@ -576,7 +576,7 @@ Mercatini di Spinone al Lago`;
     ["#iSend", "#iTest", "#iClose"].forEach((s) => ($(s).disabled = true));
     // Invio lento e regolare per non far scattare i limiti di Gmail:
     // blocchi da 6 email (una sola connessione/login per blocco) e pausa tra un blocco e l'altro.
-    const BLOCCO = 6, PAUSA_MS = 1000, PAUSE_LIMITE = [3, 3, 3]; // secondi di attesa se Gmail frena
+    const BLOCCO = 6, PAUSA_MS = 12000, PAUSE_LIMITE = [120, 300, 600]; // secondi di attesa se Gmail frena
     const stato = (t) => { $("#iStato").textContent = t; };
     const attendi = async (sec, msg) => {
       for (let s = sec; s > 0 && !fermato; s--) { stato(`${msg} · riprendo tra ${s >= 60 ? Math.ceil(s / 60) + " min" : s + " s"}`); await new Promise((r) => setTimeout(r, 1000)); }
