@@ -441,5 +441,173 @@
     setTimeout(() => URL.revokeObjectURL(a.href), 2000);
   };
 
+  /* ---------- Invito a una lista ---------- */
+  const inv = $("#inv");
+  const TESTO_INVITO = `Ciao {nome},
+
+torna Natale a Spinone! Sabato 5 e domenica 6 dicembre 2026, dalle 10 alle 18, l'area Borgo del Cigno di Spinone al Lago ospiterà di nuovo i Mercatini di Natale in riva al lago, con street food, vin brulé e la pista di pattinaggio al parco.
+
+Ci farebbe molto piacere averti di nuovo tra gli espositori. Le iscrizioni sono aperte: basta compilare il modulo online, ci vogliono pochi minuti.
+
+[ISCRIVITI]
+
+Le richieste vengono valutate in base alla tipologia merceologica e all'ordine di arrivo, quindi ti consigliamo di non aspettare troppo.
+
+Per qualsiasi domanda puoi rispondere direttamente a questa email.
+
+A presto!
+Staff
+Mercatini di Spinone al Lago`;
+  const OGGETTO_INVITO = "Mercatini di Natale a Spinone al Lago · 5 e 6 dicembre 2026: iscrizioni aperte";
+  const RE_MAIL = /[^\s@;,<>"'()]+@[^\s@;,<>"'()]+\.[a-z]{2,}/i;
+  let registroInviti = {};
+  let listaFile = []; // da Excel/CSV
+  let destinatari = [];
+
+  $("#openInv").onclick = async () => {
+    if (!$("#iOgg").value) $("#iOgg").value = OGGETTO_INVITO;
+    if (!$("#iTxt").value) $("#iTxt").value = TESTO_INVITO;
+    try { registroInviti = (await api("/api/admin/invito")).inviati || {}; } catch {}
+    calcolaDestinatari();
+    inv.showModal();
+  };
+  $("#iClose").onclick = () => inv.close();
+
+  const pulisciNome = (s) => String(s || "").replace(RE_MAIL, "").replace(/[;,<>"\t]+/g, " ").replace(/\s+/g, " ").trim();
+
+  function righeDaTesto(txt) {
+    return txt.split(/\r?\n/).map((riga) => {
+      const m = riga.match(RE_MAIL);
+      return m ? { email: m[0].toLowerCase(), nome: pulisciNome(riga).split(" ")[0] } : null;
+    }).filter(Boolean);
+  }
+
+  function righeDaTabella(rows) {
+    if (!rows.length) return [];
+    const head = rows[0].map((h) => String(h || "").toLowerCase().trim());
+    const hasHead = head.some((h) => /mail|nome|name/.test(h)) && !head.some((h) => RE_MAIL.test(h));
+    let iMail = head.findIndex((h) => /mail/.test(h));
+    let iNome = head.findIndex((h) => /^(nome|name|first)/.test(h) || (h.includes("nome") && !h.includes("cognome")));
+    const corpo = hasHead ? rows.slice(1) : rows;
+    return corpo.map((r) => {
+      let email = iMail >= 0 && hasHead ? String(r[iMail] || "") : "";
+      if (!RE_MAIL.test(email)) email = (r.map(String).find((c) => RE_MAIL.test(c)) || "");
+      const m = email.match(RE_MAIL);
+      if (!m) return null;
+      const nome = iNome >= 0 && hasHead ? String(r[iNome] || "").trim().split(/\s+/)[0] : "";
+      return { email: m[0].toLowerCase(), nome };
+    }).filter(Boolean);
+  }
+
+  function parseCSV(txt) {
+    const sep = (txt.split("\n")[0].match(/;/g) || []).length >= (txt.split("\n")[0].match(/,/g) || []).length ? ";" : ",";
+    return txt.split(/\r?\n/).filter((l) => l.trim()).map((l) => l.split(sep).map((c) => c.replace(/^"|"$/g, "").trim()));
+  }
+
+  function caricaSheetJS() {
+    if (window.XLSX) return Promise.resolve();
+    return new Promise((res, rej) => {
+      const s = document.createElement("script");
+      s.src = "/vendor/xlsx.full.min.js";
+      s.onload = res; s.onerror = () => rej(new Error("Impossibile leggere il file Excel: salvalo come CSV e riprova."));
+      document.head.appendChild(s);
+    });
+  }
+
+  $("#iFile").addEventListener("change", async (e) => {
+    const f = e.target.files[0];
+    if (!f) return;
+    try {
+      let rows;
+      if (/\.xlsx?$/i.test(f.name)) {
+        await caricaSheetJS();
+        const wb = XLSX.read(await f.arrayBuffer(), { type: "array" });
+        rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1, defval: "" });
+      } else {
+        rows = parseCSV(await f.text());
+      }
+      listaFile = righeDaTabella(rows);
+      $("#iFileName").textContent = `${f.name} · ${listaFile.length} indirizzi trovati`;
+    } catch (err) { erroreInv(err.message); }
+    e.target.value = "";
+    calcolaDestinatari();
+  });
+  ["#iList"].forEach((s) => $(s).addEventListener("input", calcolaDestinatari));
+  ["#iSkipIscritti", "#iSkipInviati"].forEach((s) => $(s).addEventListener("change", calcolaDestinatari));
+
+  function calcolaDestinatari() {
+    const tutti = [...listaFile, ...righeDaTesto($("#iList").value)];
+    const visti = new Map();
+    for (const d of tutti) if (!visti.has(d.email) || (!visti.get(d.email).nome && d.nome)) visti.set(d.email, d);
+    const iscritti = new Set(dati.map((r) => r.email.toLowerCase()));
+    let escIscr = 0, escInv = 0;
+    destinatari = [...visti.values()].filter((d) => {
+      if ($("#iSkipIscritti").checked && iscritti.has(d.email)) { escIscr++; return false; }
+      if ($("#iSkipInviati").checked && registroInviti[d.email]) { escInv++; return false; }
+      return true;
+    });
+    const doppi = tutti.length - visti.size;
+    const note = [doppi && `${doppi} doppioni rimossi`, escIscr && `${escIscr} già iscritti esclusi`, escInv && `${escInv} già invitati esclusi`].filter(Boolean).join(" · ");
+    $("#iSum").innerHTML = destinatari.length
+      ? `${destinatari.length} destinatari` + (note ? `<small>${note}</small>` : "")
+      : "Nessun destinatario." + (note ? `<small>${note}</small>` : "");
+    $("#iSend").textContent = destinatari.length ? `📣 Invia a ${destinatari.length}` : "📣 Invia a tutti";
+  }
+
+  const erroreInv = (msg) => { const b = $("#iErr"); b.textContent = msg; b.classList.add("show"); };
+  const msgInv = () => ({ oggetto: $("#iOgg").value, testo: $("#iTxt").value });
+
+  $("#iPreview").onclick = async () => {
+    $("#iErr").classList.remove("show");
+    try {
+      const esempio = destinatari[0] || { email: "esempio@example.com", nome: "Mario" };
+      const r = await api("/api/admin/invito", { method: "POST", body: JSON.stringify({ ...msgInv(), destinatari: [esempio], anteprima: true }) });
+      const f = $("#iFrame");
+      f.srcdoc = `<div style="font:13px Arial;color:#6b4a3a;padding:10px 14px">Oggetto: <b>${esc(r.subject)}</b> · esempio per ${esc(esempio.nome || esempio.email)}</div>` + r.html;
+      f.hidden = false;
+    } catch (err) { erroreInv(err.message); }
+  };
+
+  async function inviaLista(lista, { registra = true } = {}) {
+    const log = $("#iLog"), bar = $("#iBar");
+    $("#iProg").hidden = false; log.innerHTML = ""; bar.style.width = "0";
+    $("#iErr").classList.remove("show");
+    ["#iSend", "#iTest", "#iClose"].forEach((s) => ($(s).disabled = true));
+    let ok = 0, ko = 0;
+    try {
+      for (let i = 0; i < lista.length; i += 5) {
+        const blocco = lista.slice(i, i + 5);
+        let ris;
+        try {
+          ris = (await api("/api/admin/invito", { method: "POST", body: JSON.stringify({ ...msgInv(), destinatari: blocco, prova: !registra }) })).risultati;
+        } catch (err) {
+          ris = blocco.map((d) => ({ email: d.email, ok: false, errore: err.message }));
+        }
+        for (const r of ris) {
+          r.ok ? ok++ : ko++;
+          if (r.ok && registra) registroInviti[r.email] = { ultimo: new Date().toISOString() };
+          log.insertAdjacentHTML("afterbegin", r.ok ? `<div>✓ ${esc(r.email)}</div>` : `<div class="ko">✗ ${esc(r.email)} – ${esc(r.errore)}</div>`);
+        }
+        bar.style.width = Math.round(((i + blocco.length) / lista.length) * 100) + "%";
+      }
+    } finally {
+      ["#iSend", "#iTest", "#iClose"].forEach((s) => ($(s).disabled = false));
+    }
+    log.insertAdjacentHTML("afterbegin", `<div style="font-weight:800;color:var(--maroon)">Finito: ${ok} inviate${ko ? `, ${ko} non riuscite` : ""}.</div>`);
+    calcolaDestinatari();
+  }
+
+  $("#iTest").onclick = async () => {
+    const me = prompt("A quale indirizzo invio la prova?", "");
+    if (!me || !RE_MAIL.test(me)) return;
+    await inviaLista([{ email: me.trim().toLowerCase(), nome: "Mario" }], { registra: false });
+  };
+  $("#iSend").onclick = async () => {
+    if (!destinatari.length) return erroreInv("Aggiungi almeno un destinatario.");
+    if (!$("#iOgg").value.trim() || !$("#iTxt").value.trim()) return erroreInv("Scrivi oggetto e testo.");
+    if (!confirm(`Inviare l'invito a ${destinatari.length} destinatari?`)) return;
+    await inviaLista([...destinatari]);
+  };
+
   if (pwd) carica();
 })();

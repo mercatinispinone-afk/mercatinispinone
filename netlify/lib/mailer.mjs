@@ -170,3 +170,30 @@ export async function inviaRifiuto(r, opts) {
     html,
   });
 }
+
+/** Email di invito (testo libero scritto dall'organizzatore) */
+export function costruisciInvito(dest, { oggetto, testo }, siteUrl) {
+  const nome = (dest.nome || "").trim();
+  let t = String(testo || "");
+  t = nome ? t.replace(/\{nome\}/g, nome) : t.replace(/[ \t]*\{nome\}/g, "");
+  const bottone = `<div style="text-align:center;margin:8px 0 18px"><a href="${esc(siteUrl)}" style="display:inline-block;background:#a3222f;color:#fff;padding:12px 24px;border-radius:4px;text-decoration:none;font-weight:bold;font-size:16px">Iscriviti ora</a><div style="font-size:12px;color:#6b4a3a;margin-top:6px">${esc(siteUrl.replace(/^https?:\/\//, ""))}</div></div>`;
+  const linkify = (h) => h.replace(/(https?:\/\/[^\s<]+)/g, '<a href="$1" style="color:#a3222f">$1</a>');
+  const paragrafi = t.split(/\n{2,}/).map((blocco) => {
+    if (blocco.trim() === "[ISCRIVITI]") return bottone;
+    return `<p style="margin:0 0 12px">${linkify(esc(blocco.trim())).replace(/\n/g, "<br>")}</p>`;
+  });
+  if (!t.includes("[ISCRIVITI]")) paragrafi.push(bottone);
+  paragrafi.push(`<p style="margin:18px 0 0;font-size:12px;color:#8a6a5a">Ricevi questa email perché in passato hai partecipato o ti sei candidato ai nostri mercatini. Se non vuoi più ricevere comunicazioni, rispondi a questa email scrivendo "cancellami".</p>`);
+  return { subject: String(oggetto || "").replace(/\{nome\}/g, nome).trim(), html: layout("Iscrizioni aperte!", paragrafi.join("\n")) };
+}
+
+export async function inviaInvito(dest, opts, siteUrl) {
+  const { subject, html } = costruisciInvito(dest, opts, siteUrl);
+  return getTransporter().sendMail({
+    from: from(),
+    to: dest.email,
+    replyTo: process.env.ORGANIZER_EMAIL || EVENTO.contatto,
+    subject,
+    html,
+  });
+}
