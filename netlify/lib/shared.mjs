@@ -19,6 +19,24 @@ export const TIPI = {
   "3": "3) Prodotti alimentari per il consumo diretto in loco",
 };
 
+/** Dati per il pagamento, usati nell'email di pre-conferma */
+export const PAGAMENTO = {
+  iban: "IT41S0306952790100000008776",
+  intestatario: "Associazione Sotto le Stelle",
+  paypal: "https://www.paypal.com/donate/?hosted_button_id=9Z2DN88Z5K8LC",
+  giorniLavorativi: 5,
+};
+
+/** Etichette dei giorni per l'email di conferma */
+export const GIORNI_MAIUSC = { sab: "SABATO 5 DICEMBRE", dom: "DOMENICA 6 DICEMBRE" };
+
+/** Quota spazio (senza corrente, che si paga in loco) per i giorni confermati */
+export function quotaSpazio(tipo, giorni) {
+  const n = giorni.length;
+  if (!n) return 0;
+  return tipo === "3" ? 50 * n : n >= 2 ? 30 : 20;
+}
+
 export const STATI = ["in_attesa", "accettato", "rifiutato"];
 
 export const iscrizioniStore = () => getStore({ name: "iscrizioni", consistency: "strong" });

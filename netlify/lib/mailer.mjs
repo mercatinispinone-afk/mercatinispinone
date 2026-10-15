@@ -1,5 +1,5 @@
 import nodemailer from "nodemailer";
-import { EVENTO, GIORNI, TIPI, esc } from "./shared.mjs";
+import { EVENTO, GIORNI, GIORNI_MAIUSC, TIPI, PAGAMENTO, esc } from "./shared.mjs";
 
 let transporter;
 function getTransporter() {
@@ -90,5 +90,83 @@ export async function inviaNotificaOrganizzatore(r, siteUrl) {
     replyTo: r.email,
     subject: `Nuovo espositore: ${r.nome} ${r.cognome} (${TIPI[r.tipo].slice(0, 2)} ${r.giorni.join("+")})`,
     html: layout("Nuova iscrizione", corpo),
+  });
+}
+
+const euroIt = (n) => Number(n).toFixed(2).replace(".", ",").replace(",00", "");
+
+/** Email di pre-conferma postazione (giorni e quota decisi dall'organizzazione) */
+export function costruisciPreconferma(r, { giorni, quota }) {
+  const extraCorrente = r.tipo === "3" ? 20 : 5;
+  const p = (t) => `<p style="margin:0 0 12px">${t}</p>`;
+  const corpo = [
+    p(`Ciao ${esc(r.nome)},`),
+    p(`la tua postazione è <strong>pre-confermata</strong> per:`),
+    `<ul style="margin:0 0 14px;padding-left:20px;font-weight:bold;color:#5b1f24">${giorni
+      .map((g) => `<li style="margin:2px 0">${GIORNI_MAIUSC[g]}</li>`)
+      .join("")}</ul>`,
+    `<p style="margin:0 0 12px;font-size:17px">Quota di iscrizione: <strong style="color:#a3222f">${euroIt(quota)} euro</strong></p>`,
+    r.corrente === "Sì"
+      ? p(`Hai richiesto la corrente supplementare: la quota extra (${euroIt(extraCorrente)} euro al giorno) si paga in loco.`)
+      : "",
+    `<h3 style="margin:20px 0 10px;color:#a3222f;font-size:16px;text-transform:uppercase;letter-spacing:.5px">Come procedere per confermare la postazione</h3>`,
+    p(`Entro <strong>${PAGAMENTO.giorniLavorativi} giorni lavorativi</strong> dal ricevimento di questa mail procedi con il pagamento della quota tramite una delle seguenti opzioni:`),
+    `<ul style="margin:0 0 14px;padding-left:20px">
+      <li style="margin:0 0 8px"><strong>Bonifico bancario</strong><br>IBAN <span style="font-family:monospace;font-size:15px">${PAGAMENTO.iban}</span><br>intestato ad "${PAGAMENTO.intestatario}"<br>Causale: <strong>${esc(r.nome)} ${esc(r.cognome)}</strong></li>
+      <li style="margin:0 0 8px"><strong>PayPal o carta di credito</strong><br>cliccando su <a href="${PAGAMENTO.paypal}" style="color:#a3222f">questo link</a> e inviando come donazione un importo pari alla quota di iscrizione (${euroIt(quota)} euro)</li>
+    </ul>`,
+    `<div style="text-align:center;margin:6px 0 18px"><a href="${PAGAMENTO.paypal}" style="display:inline-block;background:#a3222f;color:#fff;padding:11px 20px;border-radius:4px;text-decoration:none;font-weight:bold">Paga con PayPal o carta</a></div>`,
+    p(`Il ricevimento della quota di iscrizione vale come conferma.`),
+    p(`Se non perverrà il pagamento nei termini stabiliti, la postazione verrà ceduta ai richiedenti presenti in lista d'attesa.`),
+    p(`Si precisa che la quota versata verrà rimborsata solo in caso di annullamento dell'evento e non in caso di rinuncia da parte dell'espositore.`),
+    p(`Pochi giorni prima dei Mercatini riceverai ulteriori dettagli operativi sulla tua partecipazione.`),
+    `<p style="margin:16px 0 0">Grazie, a presto!<br><strong>Staff<br>Mercatini di Spinone al Lago</strong></p>`,
+  ].join("\n");
+  return {
+    subject: "Postazione pre-confermata – Mercatini di Natale Spinone al Lago 2026",
+    html: layout("La tua postazione è pre-confermata!", corpo),
+  };
+}
+
+export async function inviaPreconferma(r, opts) {
+  const { subject, html } = costruisciPreconferma(r, opts);
+  return getTransporter().sendMail({
+    from: from(),
+    to: r.email,
+    replyTo: process.env.ORGANIZER_EMAIL || EVENTO.contatto,
+    subject,
+    html,
+  });
+}
+
+/** Email di non selezione (gentile), con eventuale messaggio personale */
+export function costruisciRifiuto(r, { messaggio = "" } = {}) {
+  const p = (t) => `<p style="margin:0 0 12px">${t}</p>`;
+  const extra = messaggio.trim()
+    ? `<p style="margin:0 0 12px;padding:10px 14px;background:#fbf1d8;border-left:4px solid #6b6a2c;border-radius:3px">${esc(messaggio.trim()).replace(/\n/g, "<br>")}</p>`
+    : "";
+  const corpo = [
+    p(`Ciao ${esc(r.nome)},`),
+    p(`grazie di cuore per aver inviato la tua richiesta di partecipazione ai Mercatini di Natale di Spinone al Lago (${EVENTO.date}) e per l'interesse che hai dimostrato verso la nostra manifestazione.`),
+    p(`Per garantire al pubblico un'offerta varia e ben bilanciata abbiamo dovuto fare una selezione in base alla tipologia merceologica e agli spazi disponibili, e purtroppo <strong>per questa edizione non è stato possibile riservarti una postazione</strong>.`),
+    extra,
+    p(`Non si tratta di un giudizio sul tuo lavoro: la tua candidatura resta tra i nostri contatti e <strong>ne terremo conto volentieri per le prossime edizioni</strong> dei mercatini. Se nel frattempo dovesse liberarsi una postazione, sarà nostra premura ricontattarti.`),
+    p(`Ti ringraziamo ancora e speriamo di incontrarti presto, magari come visitatore in riva al lago!`),
+    `<p style="margin:16px 0 0">Un caro saluto,<br><strong>Staff<br>Mercatini di Spinone al Lago</strong></p>`,
+  ].join("\n");
+  return {
+    subject: "La tua richiesta per i Mercatini di Natale di Spinone al Lago 2026",
+    html: layout("Grazie per la tua candidatura", corpo),
+  };
+}
+
+export async function inviaRifiuto(r, opts) {
+  const { subject, html } = costruisciRifiuto(r, opts);
+  return getTransporter().sendMail({
+    from: from(),
+    to: r.email,
+    replyTo: process.env.ORGANIZER_EMAIL || EVENTO.contatto,
+    subject,
+    html,
   });
 }

@@ -97,7 +97,7 @@
       <div class="stat"><div class="k">Sabato 5</div><div class="v">${sab}</div><div class="s">espositori</div></div>
       <div class="stat"><div class="k">Domenica 6</div><div class="v">${dom}</div><div class="s">espositori</div></div>
       <div class="stat"><div class="k">Per tipo</div><div class="v" style="font-size:22px">${per("1")} · ${per("2")} · ${per("3")}</div><div class="s">tipo 1 · 2 · 3</div></div>
-      <div class="stat"><div class="k">Quote accettati</div><div class="v" style="font-size:24px">${euro(acc.reduce((s, r) => s + r.quotaStimata, 0))}</div><div class="s">stima su ${euro(dati.reduce((s, r) => s + r.quotaStimata, 0))} totali</div></div>`;
+      <div class="stat"><div class="k">Quote accettati</div><div class="v" style="font-size:24px">${euro(acc.reduce((s, r) => s + (r.quotaConfermata ?? r.quotaStimata), 0))}</div><div class="s">stima su ${euro(dati.reduce((s, r) => s + r.quotaStimata, 0))} totali</div></div>`;
 
     const lista = filtrati();
     $("#empty").hidden = lista.length > 0;
@@ -112,7 +112,7 @@
         <td>${r.giorni.map((g) => `<span class="tag tg">${GIORNI[g]}</span>`).join("")}</td>
         <td class="sub">Gazebo: ${esc(r.gazebo)}<br>Corrente: ${esc(r.corrente)}<br>Asfalto: ${esc(r.asfalto)}</td>
         <td><strong>${euro(r.quotaStimata)}</strong></td>
-        <td><select class="stato ${r.stato}" data-stato>${Object.entries(STATI).map(([k, v]) => `<option value="${k}" ${k === r.stato ? "selected" : ""}>${v}</option>`).join("")}</select></td>
+        <td><select class="stato ${r.stato}" data-stato>${Object.entries(STATI).map(([k, v]) => `<option value="${k}" ${k === r.stato ? "selected" : ""}>${v}</option>`).join("")}</select>${r.stato === "accettato" && r.confermaInviata ? `<div><span class="tag ok" title="Pre-conferma inviata">✉ ${new Date(r.confermaInviata).toLocaleDateString("it-IT")}</span></div>` : ""}${r.stato === "rifiutato" && r.rifiutoInviato ? `<div><span class="tag no" title="Email di non selezione inviata">✉ ${new Date(r.rifiutoInviato).toLocaleDateString("it-IT")}</span></div>` : ""}</td>
         <td><button class="btn small ghost" data-open>Dettagli</button></td>
       </tr>`
       )
@@ -123,6 +123,12 @@
     if (!e.target.matches("[data-stato]")) return;
     const id = e.target.closest("tr").dataset.id;
     const stato = e.target.value;
+    if (stato === "accettato" || stato === "rifiutato") {
+      // Prima di cambiare stato apriamo il pannello della comunicazione (con o senza email)
+      render();
+      apri(id, stato);
+      return;
+    }
     try {
       const { iscritto } = await api(`/api/admin/iscritti?id=${encodeURIComponent(id)}`, { method: "PATCH", body: JSON.stringify({ stato }) });
       Object.assign(dati.find((r) => r.id === id), iscritto);
@@ -138,9 +144,14 @@
   $("#dClose").onclick = () => dlg.close();
   dlg.addEventListener("close", () => document.querySelectorAll("#dFoto img").forEach((i) => URL.revokeObjectURL(i.src)));
 
-  async function apri(id) {
+  async function apri(id, focus) {
     const r = dati.find((x) => x.id === id);
     corrente = r;
+    preparaConferma(r);
+    preparaRifiuto(r);
+    // Mostra il pannello pertinente: entrambi se si apre dai "Dettagli"
+    $("#conf").hidden = focus === "rifiutato";
+    $("#rif").hidden = focus === "accettato";
     $("#dTitle").textContent = `n. ${r.numero}${r.codice ? " · " + r.codice : ""} · ${r.nome} ${r.cognome}`;
     const righe = [
       ["Ricevuta il", data(r.creato)],
@@ -162,6 +173,7 @@
     const gal = $("#dFoto");
     gal.innerHTML = "";
     dlg.showModal();
+    if (focus) $(focus === "rifiutato" ? "#rif" : "#conf").scrollIntoView({ block: "start" });
     for (const key of r.foto || []) {
       try {
         const res = await fetch(`/api/admin/foto?key=${encodeURIComponent(key)}`, { headers: { "x-admin-password": pwd } });
@@ -175,6 +187,136 @@
       } catch {}
     }
   }
+
+  /* ---------- Pre-conferma ---------- */
+  const quotaSpazio = (tipo, giorni) => (!giorni.length ? 0 : tipo === "3" ? 50 * giorni.length : giorni.length >= 2 ? 30 : 20);
+  const giorniSel = () => [...document.querySelectorAll('input[name="cGiorni"]:checked')].map((c) => c.value);
+  let quotaToccata = false;
+
+  function preparaConferma(r) {
+    const giorni = r.giorniConfermati || r.giorni;
+    document.querySelectorAll('input[name="cGiorni"]').forEach((c) => (c.checked = giorni.includes(c.value)));
+    $("#cQuota").value = r.quotaConfermata ?? quotaSpazio(r.tipo, giorni);
+    quotaToccata = r.quotaConfermata != null;
+    aggiornaHint();
+    const st = $("#cStato");
+    if (r.confermaInviata) {
+      st.textContent = `✓ Pre-conferma inviata il ${data(r.confermaInviata)} · ${r.giorniConfermati.map((g) => GIORNI[g]).join(" + ")} · ${euro(r.quotaConfermata)}. Puoi reinviarla se cambi giorni o quota.`;
+      st.className = "conf-stato sent";
+      $("#cSend").textContent = "✉ Reinvia pre-conferma";
+    } else {
+      st.textContent = "Scegli i giorni assegnati e la quota: l'espositore riceverà l'email con le istruzioni di pagamento e verrà segnato come accettato.";
+      st.className = "conf-stato";
+      $("#cSend").textContent = "✉ Invia pre-conferma";
+    }
+    $("#cErr").classList.remove("show");
+    $("#cFrame").hidden = true;
+  }
+  function aggiornaHint() {
+    const r = corrente, g = giorniSel();
+    const richiesti = r.giorni.map((x) => GIORNI[x]).join(" + ");
+    $("#cQuotaHint").textContent = `Richiesti: ${richiesti} · tariffa standard ${euro(quotaSpazio(r.tipo, g))}` + (r.corrente === "Sì" ? " (+ corrente in loco)" : "");
+  }
+  document.querySelectorAll('input[name="cGiorni"]').forEach((c) =>
+    c.addEventListener("change", () => {
+      if (!quotaToccata) $("#cQuota").value = quotaSpazio(corrente.tipo, giorniSel());
+      aggiornaHint();
+      $("#cFrame").hidden = true;
+    })
+  );
+  $("#cQuota").addEventListener("input", () => { quotaToccata = true; $("#cFrame").hidden = true; });
+
+  function erroreConf(msg) { const b = $("#cErr"); b.textContent = msg; b.classList.add("show"); }
+  function payloadConf(anteprima) {
+    const giorni = giorniSel();
+    const quota = Number($("#cQuota").value);
+    if (!giorni.length) { erroreConf("Seleziona almeno un giorno."); return null; }
+    if ($("#cQuota").value === "" || !(quota >= 0)) { erroreConf("Inserisci una quota valida."); return null; }
+    $("#cErr").classList.remove("show");
+    return { giorni, quota, anteprima };
+  }
+
+  $("#cPreview").onclick = async () => {
+    const body = payloadConf(true);
+    if (!body) return;
+    try {
+      const r = await api(`/api/admin/conferma?id=${encodeURIComponent(corrente.id)}`, { method: "POST", body: JSON.stringify(body) });
+      const f = $("#cFrame");
+      f.srcdoc = r.html;
+      f.hidden = false;
+      f.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    } catch (err) { erroreConf(err.message); }
+  };
+
+  $("#cSend").onclick = async () => {
+    const body = payloadConf(false);
+    if (!body) return;
+    const testo = `Inviare l'email di pre-conferma a ${corrente.email}?\n\nGiorni: ${body.giorni.map((g) => GIORNI[g]).join(" + ")}\nQuota: ${euro(body.quota)}`;
+    if (!confirm(testo)) return;
+    const btn = $("#cSend");
+    btn.disabled = true; const t = btn.textContent; btn.textContent = "Invio…";
+    try {
+      const { iscritto } = await api(`/api/admin/conferma?id=${encodeURIComponent(corrente.id)}`, { method: "POST", body: JSON.stringify(body) });
+      Object.assign(corrente, iscritto);
+      render();
+      preparaConferma(corrente);
+    } catch (err) { erroreConf(err.message); }
+    finally { btn.disabled = false; if (btn.textContent === "Invio…") btn.textContent = t; }
+  };
+
+  $("#cNoMail").onclick = async () => {
+    try {
+      const { iscritto } = await api(`/api/admin/iscritti?id=${encodeURIComponent(corrente.id)}`, { method: "PATCH", body: JSON.stringify({ stato: "accettato" }) });
+      Object.assign(corrente, iscritto);
+      dlg.close(); render();
+    } catch (err) { erroreConf(err.message); }
+  };
+
+  /* ---------- Non selezione ---------- */
+  function preparaRifiuto(r) {
+    $("#rMsg").value = "";
+    $("#rErr").classList.remove("show");
+    $("#rFrame").hidden = true;
+    const st = $("#rStato");
+    if (r.rifiutoInviato) {
+      st.textContent = `✓ Email di non selezione inviata il ${data(r.rifiutoInviato)}.`;
+      st.className = "conf-stato sent";
+      $("#rSend").textContent = "✉ Reinvia email di non selezione";
+    } else {
+      st.textContent = "L'espositore riceverà un'email di ringraziamento in cui si spiega che non è stato selezionato e che terremo conto della candidatura per le prossime edizioni.";
+      st.className = "conf-stato";
+      $("#rSend").textContent = "✉ Invia email di non selezione";
+    }
+  }
+  const erroreRif = (msg) => { const b = $("#rErr"); b.textContent = msg; b.classList.add("show"); };
+  $("#rMsg").addEventListener("input", () => ($("#rFrame").hidden = true));
+
+  $("#rPreview").onclick = async () => {
+    try {
+      const r = await api(`/api/admin/rifiuto?id=${encodeURIComponent(corrente.id)}`, { method: "POST", body: JSON.stringify({ messaggio: $("#rMsg").value, anteprima: true }) });
+      const f = $("#rFrame");
+      f.srcdoc = r.html; f.hidden = false;
+      f.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    } catch (err) { erroreRif(err.message); }
+  };
+  $("#rSend").onclick = async () => {
+    if (!confirm(`Inviare l'email di non selezione a ${corrente.email}?`)) return;
+    const btn = $("#rSend");
+    btn.disabled = true; const t = btn.textContent; btn.textContent = "Invio…";
+    try {
+      const { iscritto } = await api(`/api/admin/rifiuto?id=${encodeURIComponent(corrente.id)}`, { method: "POST", body: JSON.stringify({ messaggio: $("#rMsg").value }) });
+      Object.assign(corrente, iscritto);
+      render(); preparaRifiuto(corrente);
+    } catch (err) { erroreRif(err.message); }
+    finally { btn.disabled = false; if (btn.textContent === "Invio…") btn.textContent = t; }
+  };
+  $("#rNoMail").onclick = async () => {
+    try {
+      const { iscritto } = await api(`/api/admin/iscritti?id=${encodeURIComponent(corrente.id)}`, { method: "PATCH", body: JSON.stringify({ stato: "rifiutato" }) });
+      Object.assign(corrente, iscritto);
+      dlg.close(); render();
+    } catch (err) { erroreRif(err.message); }
+  };
 
   $("#dSave").onclick = async () => {
     try {
@@ -216,6 +358,10 @@
       ["Quota indicativa (€)", (r) => Number(r.quotaStimata).toFixed(2).replace(".", ",")],
       ["N. foto", (r) => r.foto?.length || 0],
       ["Email conferma inviata", (r) => (r.emailInviata ? "Sì" : "No")],
+      ["Giorni confermati", (r) => (r.giorniConfermati || []).map((g) => GIORNI[g]).join(" + ")],
+      ["Quota confermata (€)", (r) => (r.quotaConfermata != null ? Number(r.quotaConfermata).toFixed(2).replace(".", ",") : "")],
+      ["Pre-conferma inviata", (r) => (r.confermaInviata ? data(r.confermaInviata) : "")],
+      ["Email non selezione inviata", (r) => (r.rifiutoInviato ? data(r.rifiutoInviato) : "")],
       ["Note interne", (r) => r.note],
     ];
     const cell = (v) => {

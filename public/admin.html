@@ -53,6 +53,22 @@
   .dlg-actions { display: flex; gap: 8px; flex-wrap: wrap; justify-content: space-between; margin-top: 16px; }
   .btn.danger { background: transparent; color: var(--red); border: 2px solid var(--red); }
   .btn.danger:hover { background: var(--red); color: #fff; }
+  .conf { margin-top: 18px; background: #f3ead0; border-radius: var(--radius); padding: 14px 16px; border-left: 5px solid var(--olive); }
+  .conf h3 { margin: 0 0 4px; font-family: var(--head); font-weight: 400; color: var(--maroon); font-size: 20px; }
+  .conf-stato { margin: 0 0 10px; font-size: 14px; color: var(--muted); }
+  .conf-stato.sent { color: var(--ok); font-weight: 700; }
+  .conf-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px 20px; }
+  .conf-lbl { display: block; font-weight: 800; color: var(--maroon); margin-bottom: 6px; font-size: 14px; }
+  .conf-chk { display: flex; gap: 8px; align-items: center; margin: 4px 0; }
+  .conf-chk input { accent-color: var(--red); width: 17px; height: 17px; }
+  .conf input[type=number] { width: 100%; font: inherit; padding: 8px 10px; border: 2px solid var(--line); border-radius: var(--radius); background: #fff; }
+  .conf-err { display: none; color: var(--red); font-weight: 700; font-size: 14px; margin-top: 8px; }
+  .conf-err.show { display: block; }
+  .conf iframe { width: 100%; height: 520px; border: 0; border-radius: var(--radius); margin-top: 12px; background: #f7e9c6; }
+  .conf-no { border-left-color: var(--red); }
+  .tag.no { background: #f7d6d6; color: #8a1f22; }
+  .tag.ok { background: #dfeccc; color: #33501a; }
+  @media (max-width: 640px) { .conf-grid { grid-template-columns: 1fr; } }
   @media (max-width: 640px) { .dl { grid-template-columns: 1fr; } .dl dt { margin-top: 6px; } }
 </style>
 </head>
@@ -108,6 +124,48 @@
   <div class="dlg-body">
     <dl class="dl" id="dList"></dl>
     <div class="gallery" id="dFoto"></div>
+    <div class="conf" id="conf">
+      <h3>Pre-conferma postazione</h3>
+      <p class="conf-stato" id="cStato"></p>
+      <div class="conf-grid">
+        <div>
+          <div class="conf-lbl">Giorni confermati</div>
+          <label class="conf-chk"><input type="checkbox" value="sab" name="cGiorni"> Sabato 5 dicembre</label>
+          <label class="conf-chk"><input type="checkbox" value="dom" name="cGiorni"> Domenica 6 dicembre</label>
+        </div>
+        <div>
+          <label class="conf-lbl" for="cQuota">Quota di iscrizione (€)</label>
+          <input type="number" id="cQuota" min="0" step="1" inputmode="decimal">
+          <div class="hint" id="cQuotaHint" style="margin-top:4px"></div>
+        </div>
+      </div>
+      <div class="conf-err" id="cErr"></div>
+      <div class="dlg-actions" style="margin-top:10px">
+        <button class="btn small ghost" id="cPreview" type="button">Anteprima email</button>
+        <span style="display:flex;gap:8px;flex-wrap:wrap">
+          <button class="btn small ghost" id="cNoMail" type="button">Accetta senza email</button>
+          <button class="btn small" id="cSend" type="button">✉ Invia pre-conferma</button>
+        </span>
+      </div>
+      <iframe id="cFrame" title="Anteprima email" hidden></iframe>
+    </div>
+
+    <div class="conf conf-no" id="rif">
+      <h3>Comunicazione di non selezione</h3>
+      <p class="conf-stato" id="rStato"></p>
+      <label class="conf-lbl" for="rMsg">Messaggio personale (facoltativo)</label>
+      <textarea id="rMsg" style="min-height:60px" placeholder="Es. quest'anno avevamo già molti espositori di candele: ti aspettiamo ai mercatini di primavera!"></textarea>
+      <div class="conf-err" id="rErr"></div>
+      <div class="dlg-actions" style="margin-top:10px">
+        <button class="btn small ghost" id="rPreview" type="button">Anteprima email</button>
+        <span style="display:flex;gap:8px;flex-wrap:wrap">
+          <button class="btn small ghost" id="rNoMail" type="button">Rifiuta senza email</button>
+          <button class="btn small secondary" id="rSend" type="button">✉ Invia email di non selezione</button>
+        </span>
+      </div>
+      <iframe id="rFrame" title="Anteprima email" hidden></iframe>
+    </div>
+
     <div class="field" style="margin-top:16px">
       <label for="dNote">Note interne (postazione assegnata, pagamento…)</label>
       <textarea id="dNote" style="min-height:70px"></textarea>
