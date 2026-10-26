@@ -81,6 +81,10 @@
   .inv-log { font-size: 13px; max-height: 140px; overflow: auto; color: var(--muted); }
   .inv-log .ko { color: var(--red); font-weight: 700; }
   .conf-pay { border-left-color: var(--gold); }
+  .conf-sol { border-left-color: var(--orange); background: #fbe7cf; }
+  .tag.warn { background: #fde2bf; color: #7a4510; }
+  .tag.late { background: #a3222f; color: #fff; }
+  select.stato.annullato { background: #e5ddd0; color: #6b5a4a; }
   .conf-pay.done { background: #e3ecd2; border-left-color: #4f6b2c; }
   .conf-grid3 { grid-template-columns: 1fr 1fr 1fr; }
   .conf select, .conf input[type=date] { width: 100%; font: inherit; padding: 8px 10px; border: 2px solid var(--line); border-radius: var(--radius); background: #fff; }
@@ -119,8 +123,9 @@
       <input type="search" id="q" placeholder="Cerca nome, email, telefono, merce…">
       <select id="fTipo"><option value="">Tutti i tipi</option><option value="1">Tipo 1 · non alimentari</option><option value="2">Tipo 2 · alimentari confezionati</option><option value="3">Tipo 3 · consumo in loco</option></select>
       <select id="fGiorno"><option value="">Tutti i giorni</option><option value="sab">Sabato 5</option><option value="dom">Domenica 6</option><option value="both">Entrambi</option></select>
-      <select id="fStato"><option value="">Tutti gli stati</option><option value="in_attesa">In attesa</option><option value="accettato">Pre-confermati (da pagare)</option><option value="confermato">Confermati (pagato)</option><option value="rifiutato">Rifiutati</option></select>
+      <select id="fStato"><option value="">Tutti gli stati</option><option value="in_attesa">In attesa</option><option value="accettato">Pre-confermati (da pagare)</option><option value="_scaduti">⏰ Pagamento scaduto</option><option value="confermato">Confermati (pagato)</option><option value="rifiutato">Rifiutati</option><option value="annullato">Annullati</option></select>
       <span class="spacer"></span>
+      <button class="btn small" id="solTutti" type="button" style="background:var(--orange);color:var(--maroon-2)" hidden></button>
       <button class="btn small" id="csv">⬇ Esporta CSV</button>
     </div>
 
@@ -169,10 +174,28 @@
       <iframe id="cFrame" title="Anteprima email" hidden></iframe>
     </div>
 
+    <div class="conf conf-sol" id="sol">
+      <h3>Sollecito pagamento</h3>
+      <p class="conf-stato" id="sStato"></p>
+      <div class="conf-err" id="sErr"></div>
+      <div class="dlg-actions" style="margin-top:10px">
+        <button class="btn small ghost" id="sPreview" type="button">Anteprima email</button>
+        <span style="display:flex;gap:8px;flex-wrap:wrap">
+          <button class="btn small danger" id="sAnnulla" type="button">Annulla prenotazione</button>
+          <button class="btn small" id="sSend" type="button" style="background:var(--orange);color:var(--maroon-2)">⏰ Invia sollecito (48 ore)</button>
+        </span>
+      </div>
+      <iframe id="sFrame" title="Anteprima sollecito" hidden></iframe>
+    </div>
+
     <div class="conf conf-pay" id="pag">
       <h3>Pagamento e conferma definitiva</h3>
       <p class="conf-stato" id="pStato"></p>
       <div class="conf-grid conf-grid3">
+        <div style="grid-column:1/-1">
+          <label class="conf-lbl" for="pInt">Intestatario del pagamento (se diverso dall'espositore)</label>
+          <input type="text" id="pInt" maxlength="120" placeholder="Es. nome sul bonifico o sull'account PayPal" style="width:100%;font:inherit;padding:8px 10px;border:2px solid var(--line);border-radius:var(--radius);background:#fff">
+        </div>
         <div>
           <label class="conf-lbl" for="pImporto">Importo ricevuto (€)</label>
           <input type="number" id="pImporto" min="0" step="1" inputmode="decimal">

@@ -1,5 +1,5 @@
-import { iscrizioniStore, fotoStore, json, isAdmin, STATI, GIORNI, METODI_PAGAMENTO } from "../lib/shared.mjs";
-import { costruisciPreconferma, inviaPreconferma, costruisciRifiuto, inviaRifiuto } from "../lib/mailer.mjs";
+import { iscrizioniStore, fotoStore, json, isAdmin, STATI, GIORNI, METODI_PAGAMENTO, ORE_SOLLECITO } from "../lib/shared.mjs";
+import { costruisciPreconferma, inviaPreconferma, costruisciRifiuto, inviaRifiuto, costruisciSollecito, inviaSollecito } from "../lib/mailer.mjs";
 
 /**
  * API area riservata (header x-admin-password obbligatorio)
@@ -9,6 +9,7 @@ import { costruisciPreconferma, inviaPreconferma, costruisciRifiuto, inviaRifiut
  *  DELETE /api/admin/iscritti?id=<id>    -> elimina iscrizione e foto
  *  POST   /api/admin/conferma?id=<id>     -> { giorni, quota, anteprima } invia email di pre-conferma
  *  POST   /api/admin/rifiuto?id=<id>      -> { messaggio, anteprima } invia email di non selezione
+ *  POST   /api/admin/sollecito?id=<id>    -> { anteprima } invia sollecito di pagamento (48 ore)
  */
 export default async (req) => {
   if (!process.env.ADMIN_PASSWORD) return json({ error: "ADMIN_PASSWORD non configurata su Netlify" }, 500);
@@ -27,7 +28,7 @@ export default async (req) => {
     });
   }
 
-  if (!["iscritti", "conferma", "rifiuto"].includes(risorsa)) return json({ error: "Non trovato" }, 404);
+  if (!["iscritti", "conferma", "rifiuto", "sollecito"].includes(risorsa)) return json({ error: "Non trovato" }, 404);
 
   if (req.method === "GET" && risorsa === "iscritti") {
     const { blobs } = await store.list({ prefix: "iscritti/" });
@@ -67,6 +68,25 @@ export default async (req) => {
     return json({ ok: true, iscritto: rec });
   }
 
+  if (risorsa === "sollecito") {
+    if (req.method !== "POST") return json({ error: "Metodo non consentito" }, 405);
+    if (rec.stato !== "accettato" || rec.pagamento) return json({ error: "Il sollecito vale solo per i pre-confermati senza pagamento" }, 400);
+    const body = await req.json().catch(() => ({}));
+    const scadenza = new Date(Date.now() + ORE_SOLLECITO * 3600 * 1000);
+    if (body.anteprima) return json(costruisciSollecito(rec, { scadenza }));
+    try {
+      await inviaSollecito(rec, { scadenza });
+    } catch (e) {
+      console.error("Errore invio sollecito:", e.message);
+      return json({ error: "Email non inviata: " + e.message }, 502);
+    }
+    rec.sollecitoInviato = new Date().toISOString();
+    rec.sollecitoScadenza = scadenza.toISOString();
+    rec.aggiornato = rec.sollecitoInviato;
+    await store.setJSON(key, rec);
+    return json({ ok: true, iscritto: rec });
+  }
+
   if (risorsa === "rifiuto") {
     if (req.method !== "POST") return json({ error: "Metodo non consentito" }, 405);
     const body = await req.json().catch(() => ({}));
@@ -99,7 +119,8 @@ export default async (req) => {
       const metodo = METODI_PAGAMENTO.includes(body.pagamento.metodo) ? body.pagamento.metodo : "Altro";
       const data = /^\d{4}-\d{2}-\d{2}$/.test(body.pagamento.data || "") ? body.pagamento.data : new Date().toISOString().slice(0, 10);
       if (!Number.isFinite(importo) || importo < 0 || importo > 10000) return json({ error: "Importo non valido" }, 400);
-      rec.pagamento = { importo, metodo, data, registrato: new Date().toISOString() };
+      const intestatario = typeof body.pagamento.intestatario === "string" ? body.pagamento.intestatario.trim().slice(0, 120) : "";
+      rec.pagamento = { importo, metodo, data, intestatario, registrato: new Date().toISOString() };
     }
     rec.aggiornato = new Date().toISOString();
     await store.setJSON(key, rec);
@@ -116,4 +137,4 @@ export default async (req) => {
   return json({ error: "Metodo non consentito" }, 405);
 };
 
-export const config = { path: ["/api/admin/iscritti", "/api/admin/foto", "/api/admin/conferma", "/api/admin/rifiuto"] };
+export const config = { path: ["/api/admin/iscritti", "/api/admin/foto", "/api/admin/conferma", "/api/admin/rifiuto", "/api/admin/sollecito"] };

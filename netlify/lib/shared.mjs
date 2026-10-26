@@ -38,7 +38,22 @@ export function quotaSpazio(tipo, giorni) {
 }
 
 // accettato = pre-confermato (email inviata, in attesa di pagamento); confermato = pagamento ricevuto
-export const STATI = ["in_attesa", "accettato", "confermato", "rifiutato"];
+export const STATI = ["in_attesa", "accettato", "confermato", "rifiutato", "annullato"];
+/** Scadenza pagamento: N giorni lavorativi dall'invio della pre-conferma (esclusi weekend e festivi nazionali) */
+const FESTIVI = ["01-01", "01-06", "04-25", "05-01", "06-02", "08-15", "11-01", "12-08", "12-25", "12-26"];
+export function scadenzaPagamento(iso, giorni = PAGAMENTO.giorniLavorativi) {
+  const d = new Date(iso);
+  let n = 0;
+  while (n < giorni) {
+    d.setDate(d.getDate() + 1);
+    const md = String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
+    if (d.getDay() !== 0 && d.getDay() !== 6 && !FESTIVI.includes(md)) n++;
+  }
+  d.setHours(23, 59, 59, 0);
+  return d;
+}
+export const ORE_SOLLECITO = 48;
+
 export const METODI_PAGAMENTO = ["Bonifico", "PayPal / carta", "Contanti", "Altro"];
 
 export const iscrizioniStore = () => getStore({ name: "iscrizioni", consistency: "strong" });

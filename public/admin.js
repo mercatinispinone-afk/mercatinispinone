@@ -14,7 +14,30 @@
     "3": "3) Alimentari per consumo diretto in loco",
   };
   const GIORNI = { sab: "Sab 5", dom: "Dom 6" };
-  const STATI = { in_attesa: "In attesa", accettato: "Pre-confermato", confermato: "Confermato ✓", rifiutato: "Rifiutato" };
+  const STATI = { in_attesa: "In attesa", accettato: "Pre-confermato", confermato: "Confermato ✓", rifiutato: "Rifiutato", annullato: "Annullato" };
+
+  /* Scadenze pagamento: 5 giorni lavorativi dalla pre-conferma, poi sollecito con 48 ore */
+  const FESTIVI = ["01-01", "01-06", "04-25", "05-01", "06-02", "08-15", "11-01", "12-08", "12-25", "12-26"];
+  function scadenzaPagamento(iso, giorni = 5) {
+    const d = new Date(iso); let n = 0;
+    while (n < giorni) {
+      d.setDate(d.getDate() + 1);
+      const md = String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
+      if (d.getDay() !== 0 && d.getDay() !== 6 && !FESTIVI.includes(md)) n++;
+    }
+    d.setHours(23, 59, 59, 0);
+    return d;
+  }
+  /** Situazione pagamento di un pre-confermato: null | in_tempo | scaduto | sollecitato | sollecito_scaduto */
+  function statoPagamento(r) {
+    if (r.stato !== "accettato" || r.pagamento || !r.confermaInviata) return null;
+    const ora = Date.now();
+    if (r.sollecitoInviato) return { tipo: ora > new Date(r.sollecitoScadenza) ? "sollecito_scaduto" : "sollecitato", data: new Date(r.sollecitoScadenza) };
+    const sc = scadenzaPagamento(r.confermaInviata);
+    return { tipo: ora > sc ? "scaduto" : "in_tempo", data: sc };
+  }
+  const ggmm = (d) => d.toLocaleDateString("it-IT", { day: "2-digit", month: "2-digit" });
+  const ggmmhh = (d) => d.toLocaleString("it-IT", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
   const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
   const euro = (n) => "€ " + Number(n || 0).toFixed(2).replace(".", ",");
   const data = (iso) => new Date(iso).toLocaleString("it-IT", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" });
@@ -61,7 +84,8 @@
     return dati
       .filter((r) => {
         if (t && r.tipo !== t) return false;
-        if (s && r.stato !== s) return false;
+        if (s === "_scaduti") { if (statoPagamento(r)?.tipo !== "scaduto" && statoPagamento(r)?.tipo !== "sollecito_scaduto") return false; }
+        else if (s && r.stato !== s) return false;
         if (g === "both" && r.giorni.length < 2) return false;
         if (g && g !== "both" && !r.giorni.includes(g)) return false;
         if (q) {
@@ -102,6 +126,9 @@
       <div class="stat"><div class="k">Per tipo</div><div class="v" style="font-size:22px">${per("1")} · ${per("2")} · ${per("3")}</div><div class="s">tipo 1 · 2 · 3</div></div>
       <div class="stat"><div class="k">Incassato</div><div class="v" style="font-size:24px">${euro(incassato)}</div><div class="s">${conf.length} ${conf.length === 1 ? "pagamento" : "pagamenti"} · da incassare ${euro(daIncassare)}</div></div>`;
 
+    const nScaduti = dati.filter((r) => statoPagamento(r)?.tipo === "scaduto").length;
+    $("#solTutti").hidden = !nScaduti;
+    $("#solTutti").textContent = `⏰ Sollecita scaduti (${nScaduti})`;
     const lista = filtrati();
     $("#empty").hidden = lista.length > 0;
     $("#rows").innerHTML = lista
@@ -115,18 +142,27 @@
         <td>${r.giorni.map((g) => `<span class="tag tg">${GIORNI[g]}</span>`).join("")}</td>
         <td class="sub">Gazebo: ${esc(r.gazebo)}<br>Corrente: ${esc(r.corrente)}<br>Asfalto: ${esc(r.asfalto)}</td>
         <td><strong>${euro(r.quotaStimata)}</strong></td>
-        <td><select class="stato ${r.stato}" data-stato>${Object.entries(STATI).map(([k, v]) => `<option value="${k}" ${k === r.stato ? "selected" : ""}>${v}</option>`).join("")}</select>${r.stato === "accettato" ? `<div>${r.confermaInviata ? `<span class="tag ok" title="Pre-conferma inviata">✉ ${new Date(r.confermaInviata).toLocaleDateString("it-IT")}</span>` : ""}<button class="btn-pay" data-pay title="Registra il pagamento e conferma la postazione">€ Pagato?</button></div>` : ""}${r.stato === "confermato" && r.pagamento ? `<div><span class="tag paid" title="${esc(r.pagamento.metodo)}">€ ${esc(String(r.pagamento.importo))} · ${new Date(r.pagamento.data).toLocaleDateString("it-IT")}</span></div>` : ""}${r.stato === "rifiutato" && r.rifiutoInviato ? `<div><span class="tag no" title="Email di non selezione inviata">✉ ${new Date(r.rifiutoInviato).toLocaleDateString("it-IT")}</span></div>` : ""}</td>
+        <td><select class="stato ${r.stato}" data-stato>${Object.entries(STATI).map(([k, v]) => `<option value="${k}" ${k === r.stato ? "selected" : ""}>${v}</option>`).join("")}</select>${r.stato === "accettato" ? `<div>${r.confermaInviata ? `<span class="tag ok" title="Pre-conferma inviata">✉ ${new Date(r.confermaInviata).toLocaleDateString("it-IT")}</span>` : ""}<button class="btn-pay" data-pay title="Registra il pagamento e conferma la postazione">€ Pagato?</button>${badgePagamento(r)}</div>` : ""}${r.stato === "confermato" && r.pagamento ? `<div><span class="tag paid" title="${esc(r.pagamento.metodo)}">€ ${esc(String(r.pagamento.importo))} · ${new Date(r.pagamento.data).toLocaleDateString("it-IT")}</span></div>` : ""}${r.stato === "rifiutato" && r.rifiutoInviato ? `<div><span class="tag no" title="Email di non selezione inviata">✉ ${new Date(r.rifiutoInviato).toLocaleDateString("it-IT")}</span></div>` : ""}</td>
         <td><button class="btn small ghost" data-open>Dettagli</button></td>
       </tr>`
       )
       .join("");
   }
 
+  function badgePagamento(r) {
+    const sp = statoPagamento(r);
+    if (!sp) return "";
+    if (sp.tipo === "in_tempo") return `<div><span class="tag" style="background:#efe2c2;color:#5b1f24" title="Scadenza pagamento (5 giorni lavorativi)">entro ${ggmm(sp.data)}</span></div>`;
+    if (sp.tipo === "scaduto") return `<div><button class="btn-pay" data-sol style="border-color:var(--red);color:var(--red)" title="Scaduto il ${ggmm(sp.data)}">⏰ Sollecita</button></div>`;
+    if (sp.tipo === "sollecitato") return `<div><span class="tag warn" title="Sollecito inviato">⏰ fino al ${ggmmhh(sp.data)}</span></div>`;
+    return `<div><button class="btn-pay" data-sol style="border-color:var(--red);background:var(--red);color:#fff" title="Le 48 ore del sollecito sono passate">⛔ 48h scadute</button></div>`;
+  }
+
   $("#rows").addEventListener("change", async (e) => {
     if (!e.target.matches("[data-stato]")) return;
     const id = e.target.closest("tr").dataset.id;
     const stato = e.target.value;
-    if (stato === "accettato" || stato === "rifiutato" || stato === "confermato") {
+    if (stato === "accettato" || stato === "rifiutato" || stato === "confermato" || stato === "annullato") {
       // Prima di cambiare stato apriamo il pannello della comunicazione (con o senza email)
       render();
       apri(id, stato);
@@ -141,6 +177,7 @@
   $("#rows").addEventListener("click", (e) => {
     if (e.target.matches("[data-open]")) apri(e.target.closest("tr").dataset.id);
     if (e.target.matches("[data-pay]")) apri(e.target.closest("tr").dataset.id, "confermato");
+    if (e.target.matches("[data-sol]")) apri(e.target.closest("tr").dataset.id, "sollecito");
   });
 
   /* ---------- Dettaglio ---------- */
@@ -154,15 +191,19 @@
     preparaConferma(r);
     preparaRifiuto(r);
     preparaPagamento(r);
+    preparaSollecito(r);
+    const daPagare = r.stato === "accettato" && !r.pagamento && !!r.confermaInviata;
     // Mostra solo il pannello pertinente; dai "Dettagli" quelli utili per lo stato attuale
     if (focus) {
       $("#conf").hidden = focus !== "accettato";
       $("#rif").hidden = focus !== "rifiutato";
       $("#pag").hidden = focus !== "confermato";
+      $("#sol").hidden = !(focus === "sollecito" || focus === "annullato");
     } else {
-      $("#conf").hidden = r.stato === "confermato";
-      $("#rif").hidden = r.stato === "confermato";
+      $("#conf").hidden = ["confermato", "annullato"].includes(r.stato);
+      $("#rif").hidden = ["confermato", "annullato"].includes(r.stato);
       $("#pag").hidden = !["accettato", "confermato"].includes(r.stato);
+      $("#sol").hidden = !daPagare;
     }
     $("#dTitle").textContent = `n. ${r.numero}${r.codice ? " · " + r.codice : ""} · ${r.nome} ${r.cognome}`;
     const righe = [
@@ -179,14 +220,14 @@
       ["Vicino a", r.vicinoA || "—"],
       ["Quota indicativa", euro(r.quotaStimata)],
       ["Stato", STATI[r.stato]],
-      ["Pagamento", r.pagamento ? `${euro(r.pagamento.importo)} · ${r.pagamento.metodo} · ${new Date(r.pagamento.data).toLocaleDateString("it-IT")}` : "—"],
+      ["Pagamento", r.pagamento ? `${euro(r.pagamento.importo)} · ${r.pagamento.metodo} · ${new Date(r.pagamento.data).toLocaleDateString("it-IT")}${r.pagamento.intestatario ? " · intestato a " + r.pagamento.intestatario : ""}` : "—"],
     ];
     $("#dList").innerHTML = righe.map(([k, v]) => `<dt>${k}</dt><dd>${esc(v)}</dd>`).join("");
     $("#dNote").value = r.note || "";
     const gal = $("#dFoto");
     gal.innerHTML = "";
     dlg.showModal();
-    if (focus) $({ rifiutato: "#rif", confermato: "#pag" }[focus] || "#conf").scrollIntoView({ block: "start" });
+    if (focus) $({ rifiutato: "#rif", confermato: "#pag", sollecito: "#sol", annullato: "#sol" }[focus] || "#conf").scrollIntoView({ block: "start" });
     for (const key of r.foto || []) {
       try {
         const res = await fetch(`/api/admin/foto?key=${encodeURIComponent(key)}`, { headers: { "x-admin-password": pwd } });
@@ -291,6 +332,7 @@
     const p = r.pagamento;
     $("#pImporto").value = p?.importo ?? r.quotaConfermata ?? r.quotaStimata;
     $("#pMetodo").value = p?.metodo || "Bonifico";
+    $("#pInt").value = p?.intestatario || "";
     $("#pData").value = p?.data || oggi();
     $("#pErr").classList.remove("show");
     const st = $("#pStato");
@@ -316,7 +358,7 @@
     try {
       const { iscritto } = await api(`/api/admin/iscritti?id=${encodeURIComponent(corrente.id)}`, {
         method: "PATCH",
-        body: JSON.stringify({ stato: "confermato", pagamento: { importo, metodo: $("#pMetodo").value, data: $("#pData").value } }),
+        body: JSON.stringify({ stato: "confermato", pagamento: { importo, metodo: $("#pMetodo").value, data: $("#pData").value, intestatario: $("#pInt").value } }),
       });
       Object.assign(corrente, iscritto);
       dlg.close(); render();
@@ -330,6 +372,70 @@
       Object.assign(corrente, iscritto);
       dlg.close(); render();
     } catch (err) { errorePag(err.message); }
+  };
+
+  /* ---------- Sollecito pagamento ---------- */
+  function preparaSollecito(r) {
+    $("#sErr").classList.remove("show");
+    $("#sFrame").hidden = true;
+    const st = $("#sStato");
+    const sp = statoPagamento(r);
+    st.className = "conf-stato";
+    $("#sSend").hidden = false;
+    if (!sp) {
+      st.textContent = r.stato === "annullato" ? "Prenotazione annullata." : "Nessun pagamento in sospeso per questo espositore.";
+      $("#sSend").hidden = true;
+      return;
+    }
+    if (sp.tipo === "in_tempo") st.textContent = `Pre-conferma inviata il ${data(r.confermaInviata)}: c'è tempo per pagare fino a ${sp.data.toLocaleDateString("it-IT", { weekday: "long", day: "numeric", month: "long" })} (5 giorni lavorativi). Puoi comunque inviare il sollecito.`;
+    if (sp.tipo === "scaduto") st.innerHTML = `<strong style="color:var(--red)">Termine scaduto il ${sp.data.toLocaleDateString("it-IT", { day: "numeric", month: "long" })}.</strong> Il sollecito chiede di pagare entro 48 ore (o di comunicare l'intestatario se ha già pagato); dopo puoi annullare la prenotazione e passare alla lista d'attesa.`;
+    if (sp.tipo === "sollecitato") st.textContent = `Sollecito inviato il ${data(r.sollecitoInviato)}: le 48 ore scadono il ${ggmmhh(sp.data)}.`;
+    if (sp.tipo === "sollecito_scaduto") st.innerHTML = `<strong style="color:var(--red)">Le 48 ore del sollecito sono scadute (${ggmmhh(sp.data)}).</strong> Se il pagamento non è arrivato puoi annullare la prenotazione.`;
+    $("#sSend").textContent = r.sollecitoInviato ? "⏰ Reinvia sollecito (nuove 48 ore)" : "⏰ Invia sollecito (48 ore)";
+  }
+  const erroreSol = (msg) => { const b = $("#sErr"); b.textContent = msg; b.classList.add("show"); };
+  $("#sPreview").onclick = async () => {
+    try {
+      const r = await api(`/api/admin/sollecito?id=${encodeURIComponent(corrente.id)}`, { method: "POST", body: JSON.stringify({ anteprima: true }) });
+      const f = $("#sFrame"); f.srcdoc = r.html; f.hidden = false;
+      f.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    } catch (err) { erroreSol(err.message); }
+  };
+  async function inviaSollecito(r) {
+    const { iscritto } = await api(`/api/admin/sollecito?id=${encodeURIComponent(r.id)}`, { method: "POST", body: "{}" });
+    Object.assign(r, iscritto);
+  }
+  $("#sSend").onclick = async () => {
+    if (!confirm(`Inviare il sollecito di pagamento a ${corrente.email}?\nAvrà 48 ore per pagare o comunicare l'intestatario.`)) return;
+    const btn = $("#sSend"); btn.disabled = true;
+    try { await inviaSollecito(corrente); render(); preparaSollecito(corrente); }
+    catch (err) { erroreSol(err.message); }
+    finally { btn.disabled = false; }
+  };
+  $("#sAnnulla").onclick = async () => {
+    const sp = statoPagamento(corrente);
+    const avviso = sp?.tipo === "sollecitato" ? "\n\nAttenzione: le 48 ore del sollecito non sono ancora scadute." : "";
+    if (!confirm(`Annullare la prenotazione di ${corrente.nome} ${corrente.cognome}? La postazione torna libera per la lista d'attesa.${avviso}`)) return;
+    try {
+      const { iscritto } = await api(`/api/admin/iscritti?id=${encodeURIComponent(corrente.id)}`, { method: "PATCH", body: JSON.stringify({ stato: "annullato" }) });
+      Object.assign(corrente, iscritto);
+      dlg.close(); render();
+    } catch (err) { erroreSol(err.message); }
+  };
+  // Sollecito a tutti i pagamenti scaduti (non ancora sollecitati)
+  $("#solTutti").onclick = async () => {
+    const lista = dati.filter((r) => statoPagamento(r)?.tipo === "scaduto");
+    if (!lista.length) return;
+    if (!confirm(`Inviare il sollecito di pagamento (48 ore) a ${lista.length} espositori con il termine scaduto?\n\n${lista.map((r) => "• " + r.nome + " " + r.cognome).join("\n")}`)) return;
+    const btn = $("#solTutti"); btn.disabled = true;
+    let ok = 0; const errori = [];
+    for (const r of lista) {
+      btn.textContent = `Invio ${ok + errori.length + 1} di ${lista.length}…`;
+      try { await inviaSollecito(r); ok++; } catch (err) { errori.push(`${r.nome} ${r.cognome}: ${err.message}`); }
+      await new Promise((res) => setTimeout(res, 1500));
+    }
+    btn.disabled = false; render();
+    alert(`Solleciti inviati: ${ok}` + (errori.length ? `\nNon inviati:\n${errori.join("\n")}` : ""));
   };
 
   /* ---------- Non selezione ---------- */
@@ -424,6 +530,9 @@
       ["Pagato", (r) => (r.pagamento ? "Sì" : "No")],
       ["Importo pagato (€)", (r) => (r.pagamento ? Number(r.pagamento.importo).toFixed(2).replace(".", ",") : "")],
       ["Metodo pagamento", (r) => r.pagamento?.metodo || ""],
+      ["Intestatario pagamento", (r) => r.pagamento?.intestatario || ""],
+      ["Scadenza pagamento", (r) => (r.confermaInviata && !r.pagamento && r.stato === "accettato" ? ggmm(scadenzaPagamento(r.confermaInviata)) : "")],
+      ["Sollecito inviato", (r) => (r.sollecitoInviato ? data(r.sollecitoInviato) : "")],
       ["Data pagamento", (r) => (r.pagamento ? new Date(r.pagamento.data).toLocaleDateString("it-IT") : "")],
       ["Email non selezione inviata", (r) => (r.rifiutoInviato ? data(r.rifiutoInviato) : "")],
       ["Note interne", (r) => r.note],

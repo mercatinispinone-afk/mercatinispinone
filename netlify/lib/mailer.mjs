@@ -120,6 +120,7 @@ export function costruisciPreconferma(r, { giorni, quota }) {
       <li style="margin:0 0 8px"><strong>PayPal o carta di credito</strong><br>cliccando su <a href="${PAGAMENTO.paypal}" style="color:#a3222f">questo link</a> e inviando come donazione un importo pari alla quota di iscrizione (${euroIt(quota)} euro)</li>
     </ul>`,
     `<div style="text-align:center;margin:6px 0 18px"><a href="${PAGAMENTO.paypal}" style="display:inline-block;background:#a3222f;color:#fff;padding:11px 20px;border-radius:4px;text-decoration:none;font-weight:bold">Paga con PayPal o carta</a></div>`,
+    p(`<strong>Dopo il pagamento rispondi a questa email</strong> indicando il nome dell'intestatario del bonifico o dell'account PayPal (se diverso dal tuo), così possiamo abbinare il versamento alla tua postazione.`),
     p(`Il ricevimento della quota di iscrizione vale come conferma.`),
     p(`Se non perverrà il pagamento nei termini stabiliti, la postazione verrà ceduta ai richiedenti presenti in lista d'attesa.`),
     p(`Si precisa che la quota versata verrà rimborsata solo in caso di annullamento dell'evento e non in caso di rinuncia da parte dell'espositore.`),
@@ -196,6 +197,45 @@ export async function inviaInvito(dest, opts, siteUrl) {
   return getTransporter().sendMail({
     from: from(),
     to: dest.email,
+    replyTo: process.env.ORGANIZER_EMAIL || EVENTO.contatto,
+    subject,
+    html,
+  });
+}
+
+const fmtData = (d) =>
+  new Date(d).toLocaleString("it-IT", { timeZone: "Europe/Rome", weekday: "long", day: "numeric", month: "long", hour: "2-digit", minute: "2-digit" });
+
+/** Sollecito di pagamento: 48 ore per pagare, poi la postazione passa alla lista d'attesa */
+export function costruisciSollecito(r, { scadenza }) {
+  const p = (t) => `<p style="margin:0 0 12px">${t}</p>`;
+  const quota = r.quotaConfermata ?? r.quotaStimata;
+  const giorni = (r.giorniConfermati || r.giorni).map((g) => GIORNI_MAIUSC[g]).join(" e ");
+  const inviata = new Date(r.confermaInviata).toLocaleDateString("it-IT", { timeZone: "Europe/Rome", day: "numeric", month: "long" });
+  const corpo = [
+    p(`Ciao ${esc(r.nome)},`),
+    p(`il ${inviata} ti abbiamo inviato la pre-conferma della tua postazione ai Mercatini di Natale di Spinone al Lago (${giorni}), ma ad oggi non ci risulta ancora il pagamento della quota di iscrizione di <strong>${euroIt(quota)} euro</strong>, previsto entro ${PAGAMENTO.giorniLavorativi} giorni lavorativi.`),
+    `<div style="margin:0 0 14px;padding:12px 16px;background:#fbe3e3;border-left:4px solid #a3222f;border-radius:3px;color:#5b1f24">Se il pagamento non ci arriverà entro <strong>${fmtData(scadenza)}</strong>, la prenotazione verrà annullata e la postazione sarà assegnata a chi è in lista d'attesa.</div>`,
+    `<h3 style="margin:16px 0 8px;color:#a3222f;font-size:15px;text-transform:uppercase;letter-spacing:.5px">Come pagare</h3>`,
+    `<ul style="margin:0 0 14px;padding-left:20px">
+      <li style="margin:0 0 8px"><strong>Bonifico</strong>: IBAN <span style="font-family:monospace">${PAGAMENTO.iban}</span> intestato ad "${PAGAMENTO.intestatario}" – causale <strong>${esc(r.nome)} ${esc(r.cognome)}</strong></li>
+      <li style="margin:0 0 8px"><strong>PayPal o carta</strong>: <a href="${PAGAMENTO.paypal}" style="color:#a3222f">clicca qui</a> e invia come donazione ${euroIt(quota)} euro</li>
+    </ul>`,
+    `<h3 style="margin:16px 0 8px;color:#6b6a2c;font-size:15px;text-transform:uppercase;letter-spacing:.5px">Hai già pagato?</h3>`,
+    p(`Nessun problema: <strong>rispondi a questa email</strong> indicando il <strong>nome dell'intestatario</strong> del bonifico o della donazione PayPal, la data e l'importo. Spesso chi paga non ha lo stesso nome dell'espositore e senza questa informazione non riusciamo ad abbinare il versamento alla tua postazione.`),
+    `<p style="margin:16px 0 0">Grazie e a presto!<br><strong>Staff<br>Mercatini di Spinone al Lago</strong></p>`,
+  ].join("\n");
+  return {
+    subject: "Promemoria pagamento – Mercatini di Natale Spinone al Lago 2026",
+    html: layout("Promemoria pagamento quota", corpo),
+  };
+}
+
+export async function inviaSollecito(r, opts) {
+  const { subject, html } = costruisciSollecito(r, opts);
+  return getTransporter().sendMail({
+    from: from(),
+    to: r.email,
     replyTo: process.env.ORGANIZER_EMAIL || EVENTO.contatto,
     subject,
     html,
