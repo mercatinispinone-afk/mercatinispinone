@@ -1,6 +1,6 @@
 import { getStore } from "@netlify/blobs";
 import { json, isAdmin } from "../lib/shared.mjs";
-import { costruisciInvito, inviaInvito } from "../lib/mailer.mjs";
+import { costruisciInvito, inviaInvito, costruisciComunicazione, inviaComunicazione } from "../lib/mailer.mjs";
 
 /**
  * Inviti/comunicazioni a una lista di contatti (area riservata)
@@ -35,7 +35,11 @@ export default async (req) => {
     .map((d) => ({ email: String(d?.email || "").trim().toLowerCase().slice(0, 120), nome: String(d?.nome || "").trim().slice(0, 80) }))
     .filter((d) => EMAIL_RE.test(d.email));
 
-  if (body.anteprima) return json(costruisciInvito(dest[0] || { email: "", nome: "Mario" }, { oggetto, testo }, siteUrl));
+  // tipo "comunicazione" = email libera agli espositori (non usa il registro inviti)
+  const comunicazione = body.tipo === "comunicazione";
+  const costruisci = (d) => (comunicazione ? costruisciComunicazione(d, { oggetto, testo }) : costruisciInvito(d, { oggetto, testo }, siteUrl));
+  const invia = (d) => (comunicazione ? inviaComunicazione(d, { oggetto, testo }) : inviaInvito(d, { oggetto, testo }, siteUrl));
+  if (body.anteprima) return json(costruisci(dest[0] || { email: "", nome: "Mario" }));
 
   if (!dest.length) return json({ error: "Nessun destinatario valido" }, 400);
   if (dest.length > MAX_PER_CHIAMATA) return json({ error: `Massimo ${MAX_PER_CHIAMATA} destinatari per invio` }, 400);
@@ -49,7 +53,7 @@ export default async (req) => {
       continue;
     }
     try {
-      await inviaInvito(d, { oggetto, testo }, siteUrl);
+      await invia(d);
       risultati.push({ email: d.email, ok: true });
     } catch (e) {
       console.error("Invito non inviato a", d.email, e.message);
@@ -63,7 +67,7 @@ export default async (req) => {
     await pausa(300);
   }
 
-  if (body.prova) return json({ ok: true, bloccato, risultati });
+  if (body.prova || comunicazione) return json({ ok: true, bloccato, risultati });
   const reg = (await store.get("registro", { type: "json" })) || {};
   const ora = new Date().toISOString();
   for (const r of risultati) if (r.ok) reg[r.email] = { ultimo: ora, volte: (reg[r.email]?.volte || 0) + 1 };

@@ -76,15 +76,14 @@ export async function inviaConfermaEspositore(r) {
   return getTransporter().sendMail({
     from: from(),
     to: r.email,
-    replyTo: process.env.ORGANIZER_EMAIL || EVENTO.contatto,
+    replyTo: EVENTO.contatto,
     subject: "Richiesta ricevuta – Mercatini di Natale Spinone al Lago 5-6 dicembre 2026",
     html: layout("Grazie, richiesta ricevuta!", corpo),
   });
 }
 
 export async function inviaNotificaOrganizzatore(r, siteUrl) {
-  const to = process.env.ORGANIZER_EMAIL;
-  if (!to) return null;
+  const to = EVENTO.contatto; // le notifiche arrivano sempre a mercatinispinone@gmail.com
   const corpo = `<p>Nuova iscrizione espositore ricevuta (n. ${esc(r.numero)} · codice ${esc(r.codice)}).</p>
 <table cellpadding="0" cellspacing="0" style="width:100%;border-collapse:collapse;background:#fbf1d8">${riepilogoRighe(r)}</table>
 <p style="margin-top:16px"><a href="${esc(siteUrl)}/admin" style="background:#a3222f;color:#fff;padding:10px 16px;border-radius:4px;text-decoration:none;font-weight:bold">Apri l'area iscritti</a></p>`;
@@ -138,7 +137,7 @@ export async function inviaPreconferma(r, opts) {
   return getTransporter().sendMail({
     from: from(),
     to: r.email,
-    replyTo: process.env.ORGANIZER_EMAIL || EVENTO.contatto,
+    replyTo: EVENTO.contatto,
     subject,
     html,
   });
@@ -170,7 +169,7 @@ export async function inviaRifiuto(r, opts) {
   return getTransporter().sendMail({
     from: from(),
     to: r.email,
-    replyTo: process.env.ORGANIZER_EMAIL || EVENTO.contatto,
+    replyTo: EVENTO.contatto,
     subject,
     html,
   });
@@ -197,7 +196,7 @@ export async function inviaInvito(dest, opts, siteUrl) {
   return getTransporter().sendMail({
     from: from(),
     to: dest.email,
-    replyTo: process.env.ORGANIZER_EMAIL || EVENTO.contatto,
+    replyTo: EVENTO.contatto,
     subject,
     html,
   });
@@ -236,8 +235,48 @@ export async function inviaSollecito(r, opts) {
   return getTransporter().sendMail({
     from: from(),
     to: r.email,
-    replyTo: process.env.ORGANIZER_EMAIL || EVENTO.contatto,
+    replyTo: EVENTO.contatto,
     subject,
     html,
   });
+}
+
+/** Conferma definitiva dopo il pagamento */
+export function costruisciConfermaDefinitiva(r) {
+  const p = (t) => `<p style="margin:0 0 12px">${t}</p>`;
+  const giorni = (r.giorniConfermati || r.giorni).map((g) => GIORNI_MAIUSC[g]);
+  const pag = r.pagamento || {};
+  const corpo = [
+    p(`Ciao ${esc(r.nome)},`),
+    p(`abbiamo ricevuto il pagamento${pag.importo != null ? ` di <strong>${euroIt(pag.importo)} euro</strong>` : ""}: la tua postazione ai Mercatini di Natale di Spinone al Lago è <strong>confermata</strong> per:`),
+    `<ul style="margin:0 0 14px;padding-left:20px;font-weight:bold;color:#5b1f24">${giorni.map((g) => `<li style="margin:2px 0">${g}</li>`).join("")}</ul>`,
+    `<div style="margin:0 0 14px;padding:12px 16px;background:#e3ecd2;border-left:4px solid #4f6b2c;border-radius:3px">Pochi giorni prima dei mercatini riceverai via email le <strong>istruzioni di dettaglio</strong>: posizione assegnata, accesso all'area e indicazioni per l'allestimento.</div>`,
+    p(`Intanto ti ricordiamo che l'allestimento si svolge dalle 8.00 alle 9.30 del giorno di partecipazione e deve essere completato entro le 10.00, orario di apertura al pubblico (10.00 – 18.00).`),
+    p(`Per qualsiasi domanda puoi rispondere a questa email.`),
+    `<p style="margin:16px 0 0">Grazie e a presto in riva al lago!<br><strong>Staff<br>Mercatini di Spinone al Lago</strong></p>`,
+  ].join("\n");
+  return {
+    subject: "Postazione confermata – Mercatini di Natale Spinone al Lago 2026",
+    html: layout("La tua postazione è confermata!", corpo),
+  };
+}
+
+export async function inviaConfermaDefinitiva(r) {
+  const { subject, html } = costruisciConfermaDefinitiva(r);
+  return getTransporter().sendMail({ from: from(), to: r.email, replyTo: EVENTO.contatto, subject, html });
+}
+
+/** Comunicazione libera agli espositori (testo scritto dall'organizzazione) */
+export function costruisciComunicazione(dest, { oggetto, testo }) {
+  const nome = (dest.nome || "").trim();
+  let t = String(testo || "");
+  t = nome ? t.replace(/\{nome\}/g, nome) : t.replace(/[ \t]*\{nome\}/g, "");
+  const linkify = (h) => h.replace(/(https?:\/\/[^\s<]+)/g, '<a href="$1" style="color:#a3222f">$1</a>');
+  const corpo = t.split(/\n{2,}/).map((b) => `<p style="margin:0 0 12px">${linkify(esc(b.trim())).replace(/\n/g, "<br>")}</p>`).join("\n");
+  return { subject: String(oggetto || "").replace(/\{nome\}/g, nome).trim(), html: layout("Comunicazione per gli espositori", corpo) };
+}
+
+export async function inviaComunicazione(dest, opts) {
+  const { subject, html } = costruisciComunicazione(dest, opts);
+  return getTransporter().sendMail({ from: from(), to: dest.email, replyTo: EVENTO.contatto, subject, html });
 }

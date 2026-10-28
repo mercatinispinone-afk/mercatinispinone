@@ -67,7 +67,7 @@
   .conf input[type=number] { width: 100%; font: inherit; padding: 8px 10px; border: 2px solid var(--line); border-radius: var(--radius); background: #fff; }
   .conf-err { display: none; color: var(--red); font-weight: 700; font-size: 14px; margin-top: 8px; }
   .conf-err.show { display: block; }
-  .conf iframe { width: 100%; height: 520px; border: 0; border-radius: var(--radius); margin-top: 12px; background: #f7e9c6; }
+  .conf iframe, #pFrame { width: 100%; height: 520px; border: 0; border-radius: var(--radius); margin-top: 12px; background: #f7e9c6; }
   .conf-no { border-left-color: var(--red); }
   [hidden] { display: none !important; }
   .inv-dlg { max-width: 820px; }
@@ -100,6 +100,7 @@
     <h1>Natale a Spinone · <span>area iscritti</span></h1>
     <div id="topActions" hidden>
       <button class="btn small" id="openInv" style="background:var(--gold);color:var(--maroon)">📣 Invia invito</button>
+      <button class="btn small" id="openCom" style="background:#fcf4df;color:var(--maroon)">✉ Scrivi agli espositori</button>
       <button class="btn small secondary" id="reload">Aggiorna</button>
       <button class="btn small" id="logout" style="background:transparent;border:2px solid var(--cream-2)">Esci</button>
     </div>
@@ -211,9 +212,14 @@
       </div>
       <div class="conf-err" id="pErr"></div>
       <div class="dlg-actions" style="margin-top:10px">
-        <button class="btn small ghost" id="pAnnulla" type="button">Annulla pagamento</button>
+        <span style="display:flex;flex-direction:column;gap:6px">
+          <label class="conf-chk" style="margin:0"><input type="checkbox" id="pEmail" checked> <span id="pEmailLbl">Invia all'espositore l'email di conferma definitiva</span></label>
+          <span style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn small ghost" id="pPreview" type="button">Anteprima email</button>
+          <button class="btn small ghost" id="pAnnulla" type="button">Annulla pagamento</button></span>
+        </span>
         <button class="btn small secondary" id="pSave" type="button">✓ Pagamento ricevuto · conferma postazione</button>
       </div>
+      <iframe id="pFrame" title="Anteprima conferma definitiva" hidden></iframe>
     </div>
 
     <div class="conf conf-no" id="rif">
@@ -244,10 +250,18 @@
 </dialog>
 
 <dialog id="inv" class="inv-dlg">
-  <div class="dlg-head"><h2>Invia invito a una lista</h2><button type="button" id="iClose" aria-label="Chiudi">×</button></div>
+  <div class="dlg-head"><h2 id="iTitle">Invia invito a una lista</h2><button type="button" id="iClose" aria-label="Chiudi">×</button></div>
   <div class="dlg-body">
     <div class="inv-step">
       <div class="conf-lbl">1 · Destinatari</div>
+      <div id="iSrcCom" hidden>
+        <p class="hint">Scegli a chi scrivere tra gli iscritti dell'area riservata.</p>
+        <label class="conf-chk"><input type="checkbox" class="cStati" value="confermato" checked> Confermati (pagato)</label>
+        <label class="conf-chk"><input type="checkbox" class="cStati" value="accettato"> Pre-confermati (in attesa di pagamento)</label>
+        <label class="conf-chk"><input type="checkbox" class="cStati" value="in_attesa"> In attesa di valutazione</label>
+        <div style="margin-top:8px"><select id="cGiorno" style="width:auto;font:inherit;padding:6px 10px;border:2px solid var(--line);border-radius:var(--radius)"><option value="">Tutti i giorni</option><option value="sab">Solo chi partecipa sabato 5</option><option value="dom">Solo chi partecipa domenica 6</option></select></div>
+      </div>
+      <div id="iSrcInv">
       <p class="hint">Carica un file Excel o CSV (vengono riconosciute le colonne con email e nome), oppure incolla gli indirizzi, uno per riga. Puoi scrivere anche <em>Nome; email</em>.</p>
       <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:8px">
         <label class="btn small ghost" style="cursor:pointer">📄 Carica Excel / CSV<input type="file" id="iFile" accept=".xlsx,.xls,.csv,.txt" hidden></label>
@@ -256,6 +270,7 @@
       <textarea id="iList" placeholder="mario.rossi@example.com&#10;Anna Bianchi; anna@example.com" style="min-height:90px;font-size:14px"></textarea>
       <label class="conf-chk"><input type="checkbox" id="iSkipIscritti" checked> Escludi chi si è già iscritto quest'anno</label>
       <label class="conf-chk"><input type="checkbox" id="iSkipInviati" checked> Escludi chi ha già ricevuto un invito</label>
+      </div>
       <div class="inv-sum" id="iSum">Nessun destinatario.</div>
     </div>
 
@@ -263,7 +278,7 @@
       <div class="conf-lbl">2 · Messaggio</div>
       <label class="hint" for="iOgg" style="display:block;margin:0 0 4px">Oggetto</label>
       <input type="text" id="iOgg">
-      <label class="hint" for="iTxt" style="display:block;margin:10px 0 4px">Testo · <code>{nome}</code> viene sostituito col nome (se presente) · la riga <code>[ISCRIVITI]</code> diventa il pulsante con il link al modulo</label>
+      <label class="hint" for="iTxt" style="display:block;margin:10px 0 4px">Testo · <code>{nome}</code> viene sostituito col nome (se presente) <span id="iHintIscr">· la riga <code>[ISCRIVITI]</code> diventa il pulsante con il link al modulo</span></label>
       <textarea id="iTxt" style="min-height:260px;font-size:14px"></textarea>
       <div style="margin-top:8px"><button class="btn small ghost" id="iPreview" type="button">Anteprima email</button></div>
       <iframe id="iFrame" title="Anteprima invito" hidden style="width:100%;height:560px;border:0;border-radius:var(--radius);margin-top:10px;background:#f7e9c6"></iframe>

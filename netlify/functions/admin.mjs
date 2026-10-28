@@ -1,5 +1,5 @@
 import { iscrizioniStore, fotoStore, json, isAdmin, STATI, GIORNI, METODI_PAGAMENTO, ORE_SOLLECITO } from "../lib/shared.mjs";
-import { costruisciPreconferma, inviaPreconferma, costruisciRifiuto, inviaRifiuto, costruisciSollecito, inviaSollecito } from "../lib/mailer.mjs";
+import { costruisciPreconferma, inviaPreconferma, costruisciRifiuto, inviaRifiuto, costruisciSollecito, inviaSollecito, costruisciConfermaDefinitiva, inviaConfermaDefinitiva } from "../lib/mailer.mjs";
 
 /**
  * API area riservata (header x-admin-password obbligatorio)
@@ -10,6 +10,7 @@ import { costruisciPreconferma, inviaPreconferma, costruisciRifiuto, inviaRifiut
  *  POST   /api/admin/conferma?id=<id>     -> { giorni, quota, anteprima } invia email di pre-conferma
  *  POST   /api/admin/rifiuto?id=<id>      -> { messaggio, anteprima } invia email di non selezione
  *  POST   /api/admin/sollecito?id=<id>    -> { anteprima } invia sollecito di pagamento (48 ore)
+ *  POST   /api/admin/definitiva?id=<id>   -> { anteprima, importo } email di conferma definitiva (dopo il pagamento)
  */
 export default async (req) => {
   if (!process.env.ADMIN_PASSWORD) return json({ error: "ADMIN_PASSWORD non configurata su Netlify" }, 500);
@@ -28,7 +29,7 @@ export default async (req) => {
     });
   }
 
-  if (!["iscritti", "conferma", "rifiuto", "sollecito"].includes(risorsa)) return json({ error: "Non trovato" }, 404);
+  if (!["iscritti", "conferma", "rifiuto", "sollecito", "definitiva"].includes(risorsa)) return json({ error: "Non trovato" }, 404);
 
   if (req.method === "GET" && risorsa === "iscritti") {
     const { blobs } = await store.list({ prefix: "iscritti/" });
@@ -64,6 +65,24 @@ export default async (req) => {
     rec.quotaConfermata = quota;
     rec.confermaInviata = new Date().toISOString();
     rec.aggiornato = rec.confermaInviata;
+    await store.setJSON(key, rec);
+    return json({ ok: true, iscritto: rec });
+  }
+
+  if (risorsa === "definitiva") {
+    if (req.method !== "POST") return json({ error: "Metodo non consentito" }, 405);
+    const body = await req.json().catch(() => ({}));
+    if (body.anteprima) {
+      const prova = { ...rec, pagamento: { ...(rec.pagamento || {}), importo: Number(body.importo ?? rec.pagamento?.importo ?? rec.quotaConfermata ?? 0) } };
+      return json(costruisciConfermaDefinitiva(prova));
+    }
+    if (rec.stato !== "confermato") return json({ error: "Registra prima il pagamento" }, 400);
+    try {
+      await inviaConfermaDefinitiva(rec);
+    } catch (e) {
+      return json({ error: "Email non inviata: " + e.message }, 502);
+    }
+    rec.confermaDefinitivaInviata = new Date().toISOString();
     await store.setJSON(key, rec);
     return json({ ok: true, iscritto: rec });
   }
@@ -124,7 +143,19 @@ export default async (req) => {
     }
     rec.aggiornato = new Date().toISOString();
     await store.setJSON(key, rec);
-    return json({ ok: true, iscritto: rec });
+    // Email di conferma definitiva (facoltativa) subito dopo aver registrato il pagamento
+    let emailErrore = null;
+    if (body.emailConfermaDefinitiva && rec.stato === "confermato" && rec.pagamento) {
+      try {
+        await inviaConfermaDefinitiva(rec);
+        rec.confermaDefinitivaInviata = new Date().toISOString();
+        await store.setJSON(key, rec);
+      } catch (e) {
+        console.error("Errore conferma definitiva:", e.message);
+        emailErrore = e.message;
+      }
+    }
+    return json({ ok: true, iscritto: rec, emailErrore });
   }
 
   if (req.method === "DELETE") {
@@ -137,4 +168,4 @@ export default async (req) => {
   return json({ error: "Metodo non consentito" }, 405);
 };
 
-export const config = { path: ["/api/admin/iscritti", "/api/admin/foto", "/api/admin/conferma", "/api/admin/rifiuto", "/api/admin/sollecito"] };
+export const config = { path: ["/api/admin/iscritti", "/api/admin/foto", "/api/admin/conferma", "/api/admin/rifiuto", "/api/admin/sollecito", "/api/admin/definitiva"] };

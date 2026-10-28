@@ -142,7 +142,7 @@
         <td>${r.giorni.map((g) => `<span class="tag tg">${GIORNI[g]}</span>`).join("")}</td>
         <td class="sub">Gazebo: ${esc(r.gazebo)}<br>Corrente: ${esc(r.corrente)}<br>Asfalto: ${esc(r.asfalto)}</td>
         <td><strong>${euro(r.quotaStimata)}</strong></td>
-        <td><select class="stato ${r.stato}" data-stato>${Object.entries(STATI).map(([k, v]) => `<option value="${k}" ${k === r.stato ? "selected" : ""}>${v}</option>`).join("")}</select>${r.stato === "accettato" ? `<div>${r.confermaInviata ? `<span class="tag ok" title="Pre-conferma inviata">✉ ${new Date(r.confermaInviata).toLocaleDateString("it-IT")}</span>` : ""}<button class="btn-pay" data-pay title="Registra il pagamento e conferma la postazione">€ Pagato?</button>${badgePagamento(r)}</div>` : ""}${r.stato === "confermato" && r.pagamento ? `<div><span class="tag paid" title="${esc(r.pagamento.metodo)}">€ ${esc(String(r.pagamento.importo))} · ${new Date(r.pagamento.data).toLocaleDateString("it-IT")}</span></div>` : ""}${r.stato === "rifiutato" && r.rifiutoInviato ? `<div><span class="tag no" title="Email di non selezione inviata">✉ ${new Date(r.rifiutoInviato).toLocaleDateString("it-IT")}</span></div>` : ""}</td>
+        <td><select class="stato ${r.stato}" data-stato>${Object.entries(STATI).map(([k, v]) => `<option value="${k}" ${k === r.stato ? "selected" : ""}>${v}</option>`).join("")}</select>${r.stato === "accettato" ? `<div>${r.confermaInviata ? `<span class="tag ok" title="Pre-conferma inviata">✉ ${new Date(r.confermaInviata).toLocaleDateString("it-IT")}</span>` : ""}<button class="btn-pay" data-pay title="Registra il pagamento e conferma la postazione">€ Pagato?</button>${badgePagamento(r)}</div>` : ""}${r.stato === "confermato" && r.pagamento ? `<div><span class="tag paid" title="${esc(r.pagamento.metodo)}">€ ${esc(String(r.pagamento.importo))} · ${new Date(r.pagamento.data).toLocaleDateString("it-IT")}</span>${r.confermaDefinitivaInviata ? ` <span class="tag ok" title="Email di conferma definitiva inviata">✉</span>` : ""}</div>` : ""}${r.stato === "rifiutato" && r.rifiutoInviato ? `<div><span class="tag no" title="Email di non selezione inviata">✉ ${new Date(r.rifiutoInviato).toLocaleDateString("it-IT")}</span></div>` : ""}</td>
         <td><button class="btn small ghost" data-open>Dettagli</button></td>
       </tr>`
       )
@@ -333,6 +333,11 @@
     $("#pImporto").value = p?.importo ?? r.quotaConfermata ?? r.quotaStimata;
     $("#pMetodo").value = p?.metodo || "Bonifico";
     $("#pInt").value = p?.intestatario || "";
+    $("#pFrame").hidden = true;
+    $("#pEmail").checked = !r.confermaDefinitivaInviata;
+    $("#pEmailLbl").textContent = r.confermaDefinitivaInviata
+      ? `Reinvia l'email di conferma definitiva (già inviata il ${data(r.confermaDefinitivaInviata)})`
+      : "Invia all'espositore l'email di conferma definitiva";
     $("#pData").value = p?.data || oggi();
     $("#pErr").classList.remove("show");
     const st = $("#pStato");
@@ -356,12 +361,20 @@
     if (corrente.quotaConfermata != null && importo < corrente.quotaConfermata &&
         !confirm(`L'importo (${euro(importo)}) è inferiore alla quota richiesta (${euro(corrente.quotaConfermata)}). Confermare comunque?`)) return;
     try {
-      const { iscritto } = await api(`/api/admin/iscritti?id=${encodeURIComponent(corrente.id)}`, {
+      const { iscritto, emailErrore } = await api(`/api/admin/iscritti?id=${encodeURIComponent(corrente.id)}`, {
         method: "PATCH",
-        body: JSON.stringify({ stato: "confermato", pagamento: { importo, metodo: $("#pMetodo").value, data: $("#pData").value, intestatario: $("#pInt").value } }),
+        body: JSON.stringify({ stato: "confermato", emailConfermaDefinitiva: $("#pEmail").checked, pagamento: { importo, metodo: $("#pMetodo").value, data: $("#pData").value, intestatario: $("#pInt").value } }),
       });
       Object.assign(corrente, iscritto);
       dlg.close(); render();
+      if (emailErrore) alert("Pagamento registrato, ma l'email di conferma non è partita: " + emailErrore + "\nPuoi reinviarla dalla scheda.");
+    } catch (err) { errorePag(err.message); }
+  };
+  $("#pPreview").onclick = async () => {
+    try {
+      const r = await api(`/api/admin/definitiva?id=${encodeURIComponent(corrente.id)}`, { method: "POST", body: JSON.stringify({ anteprima: true, importo: Number($("#pImporto").value) }) });
+      const f = $("#pFrame"); f.srcdoc = r.html; f.hidden = false;
+      f.scrollIntoView({ behavior: "smooth", block: "nearest" });
     } catch (err) { errorePag(err.message); }
   };
   $("#pAnnulla").onclick = async () => {
@@ -534,6 +547,7 @@
       ["Scadenza pagamento", (r) => (r.confermaInviata && !r.pagamento && r.stato === "accettato" ? ggmm(scadenzaPagamento(r.confermaInviata)) : "")],
       ["Sollecito inviato", (r) => (r.sollecitoInviato ? data(r.sollecitoInviato) : "")],
       ["Data pagamento", (r) => (r.pagamento ? new Date(r.pagamento.data).toLocaleDateString("it-IT") : "")],
+      ["Conferma definitiva inviata", (r) => (r.confermaDefinitivaInviata ? data(r.confermaDefinitivaInviata) : "")],
       ["Email non selezione inviata", (r) => (r.rifiutoInviato ? data(r.rifiutoInviato) : "")],
       ["Note interne", (r) => r.note],
     ];
@@ -573,13 +587,26 @@ Mercatini di Spinone al Lago`;
   let listaFile = []; // da Excel/CSV
   let destinatari = [];
 
-  $("#openInv").onclick = async () => {
-    if (!$("#iOgg").value) $("#iOgg").value = OGGETTO_INVITO;
-    if (!$("#iTxt").value) $("#iTxt").value = TESTO_INVITO;
-    try { registroInviti = (await api("/api/admin/invito")).inviati || {}; } catch {}
+  // La stessa finestra serve per due cose: "invito" (lista esterna) e "comunicazione" (iscritti)
+  let modo = "invito";
+  const testi = { invito: { oggetto: OGGETTO_INVITO, testo: TESTO_INVITO }, comunicazione: { oggetto: "Mercatini di Natale Spinone al Lago – ", testo: "Ciao {nome},\n\n\n\nA presto!\nStaff\nMercatini di Spinone al Lago" } };
+  function apriInvio(m) {
+    testi[modo] = { oggetto: $("#iOgg").value || testi[modo].oggetto, testo: $("#iTxt").value || testi[modo].testo };
+    modo = m;
+    $("#iOgg").value = testi[m].oggetto; $("#iTxt").value = testi[m].testo;
+    $("#iTitle").textContent = m === "invito" ? "Invia invito a una lista" : "Scrivi agli espositori";
+    $("#iSrcInv").hidden = m !== "invito"; $("#iSrcCom").hidden = m === "invito"; $("#iHintIscr").hidden = m !== "invito";
+    $("#iFrame").hidden = true; $("#iLog").innerHTML = ""; $("#iProg").hidden = true; $("#iErr").classList.remove("show");
     calcolaDestinatari();
     inv.showModal();
+  }
+  $("#openInv").onclick = async () => {
+    try { registroInviti = (await api("/api/admin/invito")).inviati || {}; } catch {}
+    apriInvio("invito");
   };
+  $("#openCom").onclick = () => apriInvio("comunicazione");
+  document.querySelectorAll(".cStati").forEach((c) => c.addEventListener("change", calcolaDestinatari));
+  $("#cGiorno").addEventListener("change", calcolaDestinatari);
   $("#iClose").onclick = () => inv.close();
 
   const pulisciNome = (s) => String(s || "").replace(RE_MAIL, "").replace(/[;,<>"\t]+/g, " ").replace(/\s+/g, " ").trim();
@@ -645,6 +672,16 @@ Mercatini di Spinone al Lago`;
   ["#iSkipIscritti", "#iSkipInviati"].forEach((s) => $(s).addEventListener("change", calcolaDestinatari));
 
   function calcolaDestinatari() {
+    if (modo === "comunicazione") {
+      const stati = [...document.querySelectorAll(".cStati:checked")].map((c) => c.value);
+      const g = $("#cGiorno").value;
+      destinatari = dati
+        .filter((r) => stati.includes(r.stato) && (!g || (r.giorniConfermati || r.giorni).includes(g)))
+        .map((r) => ({ email: r.email, nome: r.nome }));
+      $("#iSum").innerHTML = destinatari.length ? `${destinatari.length} destinatari` : "Nessun destinatario con questi filtri.";
+      $("#iSend").textContent = destinatari.length ? `✉ Invia a ${destinatari.length}` : "✉ Invia";
+      return;
+    }
     const tutti = [...listaFile, ...righeDaTesto($("#iList").value)];
     const visti = new Map();
     for (const d of tutti) if (!visti.has(d.email) || (!visti.get(d.email).nome && d.nome)) visti.set(d.email, d);
@@ -664,7 +701,7 @@ Mercatini di Spinone al Lago`;
   }
 
   const erroreInv = (msg) => { const b = $("#iErr"); b.textContent = msg; b.classList.add("show"); };
-  const msgInv = () => ({ oggetto: $("#iOgg").value, testo: $("#iTxt").value });
+  const msgInv = () => ({ oggetto: $("#iOgg").value, testo: $("#iTxt").value, tipo: modo });
 
   $("#iPreview").onclick = async () => {
     $("#iErr").classList.remove("show");
@@ -752,8 +789,8 @@ Mercatini di Spinone al Lago`;
   $("#iSend").onclick = async () => {
     if (!destinatari.length) return erroreInv("Aggiungi almeno un destinatario.");
     if (!$("#iOgg").value.trim() || !$("#iTxt").value.trim()) return erroreInv("Scrivi oggetto e testo.");
-    if (!confirm(`Inviare l'invito a ${destinatari.length} destinatari?`)) return;
-    await inviaLista([...destinatari]);
+    if (!confirm(modo === "invito" ? `Inviare l'invito a ${destinatari.length} destinatari?` : `Inviare questa comunicazione a ${destinatari.length} espositori?`)) return;
+    await inviaLista([...destinatari], { registra: modo === "invito" });
   };
 
   if (pwd) carica();
