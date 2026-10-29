@@ -71,6 +71,7 @@
       try { sessionStorage.setItem(KEY, pwd); } catch {}
       $("#login").hidden = true; $("#app").hidden = false; $("#topActions").hidden = false;
       render();
+      if (window.MA?.dopoCarica) window.MA.dopoCarica();
     } catch (err) {
       if (daLogin || !$("#login").hidden) { const b = $("#loginErr"); b.textContent = err.message; b.classList.add("show"); }
       else alert(err.message);
@@ -110,6 +111,10 @@
 
   /* ---------- Render ---------- */
   function render() {
+    renderInterno();
+    if (window.MA?.dopoRender) window.MA.dopoRender();
+  }
+  function renderInterno() {
     const tot = dati.length;
     const sab = dati.filter((r) => r.giorni.includes("sab")).length;
     const dom = dati.filter((r) => r.giorni.includes("dom")).length;
@@ -140,7 +145,7 @@
         <td><a href="mailto:${esc(r.email)}">${esc(r.email)}</a><div class="sub"><a href="tel:${esc(r.telefono)}">${esc(r.telefono)}</a></div></td>
         <td><span class="tag t${r.tipo}">${r.tipo}) ${TIPI[r.tipo]}</span><div class="sub">${esc(r.descrizione.slice(0, 70))}${r.descrizione.length > 70 ? "…" : ""}</div></td>
         <td>${r.giorni.map((g) => `<span class="tag tg">${GIORNI[g]}</span>`).join("")}</td>
-        <td class="sub">Gazebo: ${esc(r.gazebo)}<br>Corrente: ${esc(r.corrente)}<br>Asfalto: ${esc(r.asfalto)}</td>
+        <td class="sub">Gazebo: ${esc(r.gazebo)}<br>Corrente: ${esc(r.corrente)}<br>Asfalto: ${esc(r.asfalto)}${window.MA?.labelPostazioni ? window.MA.labelPostazioni(r) : ""}</td>
         <td><strong>${euro(r.quotaStimata)}</strong></td>
         <td><select class="stato ${r.stato}" data-stato>${Object.entries(STATI).map(([k, v]) => `<option value="${k}" ${k === r.stato ? "selected" : ""}>${v}</option>`).join("")}</select>${r.stato === "accettato" ? `<div>${r.confermaInviata ? `<span class="tag ok" title="Pre-conferma inviata">✉ ${new Date(r.confermaInviata).toLocaleDateString("it-IT")}</span>` : ""}<button class="btn-pay" data-pay title="Registra il pagamento e conferma la postazione">€ Pagato?</button>${badgePagamento(r)}</div>` : ""}${r.stato === "confermato" && r.pagamento ? `<div><span class="tag paid" title="${esc(r.pagamento.metodo)}">€ ${esc(String(r.pagamento.importo))} · ${new Date(r.pagamento.data).toLocaleDateString("it-IT")}</span>${r.confermaDefinitivaInviata ? ` <span class="tag ok" title="Email di conferma definitiva inviata">✉</span>` : ""}</div>` : ""}${r.stato === "rifiutato" && r.rifiutoInviato ? `<div><span class="tag no" title="Email di non selezione inviata">✉ ${new Date(r.rifiutoInviato).toLocaleDateString("it-IT")}</span></div>` : ""}</td>
         <td><button class="btn small ghost" data-open>Dettagli</button></td>
@@ -548,6 +553,8 @@
       ["Sollecito inviato", (r) => (r.sollecitoInviato ? data(r.sollecitoInviato) : "")],
       ["Data pagamento", (r) => (r.pagamento ? new Date(r.pagamento.data).toLocaleDateString("it-IT") : "")],
       ["Conferma definitiva inviata", (r) => (r.confermaDefinitivaInviata ? data(r.confermaDefinitivaInviata) : "")],
+      ["Postazione sabato", (r) => window.MA?.labelPlain?.(r, "sab") || ""],
+      ["Postazione domenica", (r) => window.MA?.labelPlain?.(r, "dom") || ""],
       ["Email non selezione inviata", (r) => (r.rifiutoInviato ? data(r.rifiutoInviato) : "")],
       ["Note interne", (r) => r.note],
     ];
@@ -791,6 +798,14 @@ Mercatini di Spinone al Lago`;
     if (!$("#iOgg").value.trim() || !$("#iTxt").value.trim()) return erroreInv("Scrivi oggetto e testo.");
     if (!confirm(modo === "invito" ? `Inviare l'invito a ${destinatari.length} destinatari?` : `Inviare questa comunicazione a ${destinatari.length} espositori?`)) return;
     await inviaLista([...destinatari], { registra: modo === "invito" });
+  };
+
+  // Interfaccia per il modulo postazioni (postazioni.js)
+  window.MA = {
+    api, esc, euro,
+    get dati() { return dati; },
+    password: () => pwd,
+    renderElenco: renderInterno,
   };
 
   if (pwd) carica();

@@ -1,0 +1,74 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 736" width="1000" height="736">
+  <!-- Mappa schematica area Borgo del Cigno, Spinone al Lago (disegno indicativo, non in scala esatta) -->
+  <defs>
+    <pattern id="stalli" width="14" height="14" patternUnits="userSpaceOnUse" patternTransform="rotate(-55)">
+      <line x1="0" y1="0" x2="0" y2="14" stroke="#ffffff" stroke-opacity=".55" stroke-width="1.4"/>
+    </pattern>
+    <pattern id="tetti" width="10" height="10" patternUnits="userSpaceOnUse" patternTransform="rotate(-35)">
+      <rect width="10" height="10" fill="#d9b8a3"/>
+      <line x1="0" y1="0" x2="0" y2="10" stroke="#c49a82" stroke-width="3"/>
+    </pattern>
+  </defs>
+
+  <rect width="1000" height="736" fill="#efe6cf"/>
+
+  <!-- Residenze (NE) -->
+  <polygon points="640,0 860,0 1000,150 1000,320 930,330 760,120" fill="url(#tetti)" opacity=".75"/>
+  <text x="880" y="210" font-family="Arial" font-size="15" fill="#7a5a4a" text-anchor="middle" transform="rotate(42 880 210)">Residenze</text>
+
+  <!-- Prato esterno -->
+  <path d="M600,120 C700,150 770,260 820,330 C870,400 940,470 1000,520 L1000,736 L720,736 L700,580 C760,560 790,500 790,430 C790,330 720,240 640,215 Z" fill="#a9c97f"/>
+
+  <!-- Parcheggio / area asfaltata lungo la statale -->
+  <path d="M525,0 L640,0 C620,40 590,90 560,140 C530,190 500,215 470,250 C430,295 400,330 385,380 C372,425 372,480 385,560 L330,560 C312,480 305,410 322,350 C342,280 380,220 425,160 C465,105 500,55 525,0 Z" fill="#b9b6ae"/>
+  <path d="M525,0 L640,0 C620,40 590,90 560,140 C530,190 500,215 470,250 C430,295 400,330 385,380 C372,425 372,480 385,560 L330,560 C312,480 305,410 322,350 C342,280 380,220 425,160 C465,105 500,55 525,0 Z" fill="url(#stalli)"/>
+  <text x="372" y="300" font-family="Arial" font-size="14" fill="#5a5650" font-weight="bold" transform="rotate(-58 372 300)">PARCHEGGIO</text>
+
+  <!-- Statale SS42 e rotatoria -->
+  <path d="M470,0 C420,90 330,220 250,330 C205,395 185,450 175,500" fill="none" stroke="#8f8b84" stroke-width="44" stroke-linecap="round"/>
+  <path d="M470,0 C420,90 330,220 250,330 C205,395 185,450 175,500" fill="none" stroke="#f4f1ea" stroke-width="2" stroke-dasharray="14 12"/>
+  <circle cx="140" cy="560" r="78" fill="none" stroke="#8f8b84" stroke-width="40"/>
+  <circle cx="140" cy="560" r="52" fill="#a9c97f"/>
+  <path d="M215,600 C280,610 320,600 360,580" fill="none" stroke="#8f8b84" stroke-width="34"/>
+  <text x="280" y="220" font-family="Arial" font-size="16" fill="#4a4740" font-weight="bold" transform="rotate(-55 280 220)">SS42</text>
+
+  <!-- Piazzetta / parcheggio sud -->
+  <path d="M330,560 L560,560 L560,736 L300,736 C300,690 310,620 330,560 Z" fill="#c9c4b8"/>
+  <text x="430" y="680" font-family="Arial" font-size="14" fill="#5a5650" font-weight="bold" text-anchor="middle">PIAZZETTA / PARCHEGGIO</text>
+
+  <!-- Prato circolare Borgo del Cigno -->
+  <circle cx="610" cy="387" r="172" fill="#b7d48d"/>
+  <circle cx="610" cy="387" r="168" fill="none" stroke="#d8c7a4" stroke-width="9"/>
+  <!-- vialetti -->
+  <path d="M640,215 C700,240 760,300 790,380" fill="none" stroke="#d8c7a4" stroke-width="8"/>
+  <path d="M778,420 L1000,560" fill="none" stroke="#d8c7a4" stroke-width="7"/>
+  <path d="M610,555 L610,600" fill="none" stroke="#d8c7a4" stroke-width="8"/>
+
+  <!-- Pista di pattinaggio -->
+  <g transform="rotate(-35 545 382)">
+    <rect x="470" y="340" width="150" height="84" rx="4" fill="#e6eef3" stroke="#7a8c99" stroke-width="3"/>
+    <text x="545" y="387" font-family="Arial" font-size="13" fill="#4f6270" text-anchor="middle" font-weight="bold">PISTA PATTINAGGIO</text>
+  </g>
+
+  <!-- Pasticceria -->
+  <polygon points="580,585 700,585 712,736 570,736" fill="#9a9590"/>
+  <text x="640" y="672" font-family="Arial" font-size="13" fill="#fff" text-anchor="middle" font-weight="bold">Pasticceria</text>
+
+  <!-- Etichette -->
+  <text x="672" y="398" font-family="Arial" font-size="12" fill="#4f6b2c" font-weight="bold" text-anchor="middle">PRATO</text>
+  <text x="672" y="414" font-family="Arial" font-size="12" fill="#4f6b2c" font-weight="bold" text-anchor="middle">BORGO DEL CIGNO</text>
+  <text x="400" y="590" font-family="Arial" font-size="12" fill="#a3222f" font-weight="bold" text-anchor="middle">▲ INGRESSO</text>
+
+  <!-- Nord e scala -->
+  <g transform="translate(950 680)">
+    <circle r="22" fill="#fffaf0" stroke="#7a5a4a"/>
+    <path d="M0,-15 L6,4 L0,0 L-6,4 Z" fill="#a3222f"/>
+    <text y="16" font-family="Arial" font-size="10" text-anchor="middle" fill="#7a5a4a">N</text>
+  </g>
+  <g transform="translate(760 712)">
+    <line x1="0" y1="0" x2="85" y2="0" stroke="#5a5650" stroke-width="3"/>
+    <line x1="0" y1="-5" x2="0" y2="5" stroke="#5a5650" stroke-width="2"/>
+    <line x1="85" y1="-5" x2="85" y2="5" stroke="#5a5650" stroke-width="2"/>
+    <text x="42" y="-6" font-family="Arial" font-size="11" text-anchor="middle" fill="#5a5650">≈ 10 m</text>
+  </g>
+</svg>

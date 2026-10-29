@@ -1,11 +1,12 @@
 import { iscrizioniStore, fotoStore, json, isAdmin, STATI, GIORNI, METODI_PAGAMENTO, ORE_SOLLECITO } from "../lib/shared.mjs";
+import { leggiLayout } from "../lib/mappa.mjs";
 import { costruisciPreconferma, inviaPreconferma, costruisciRifiuto, inviaRifiuto, costruisciSollecito, inviaSollecito, costruisciConfermaDefinitiva, inviaConfermaDefinitiva } from "../lib/mailer.mjs";
 
 /**
  * API area riservata (header x-admin-password obbligatorio)
  *  GET    /api/admin/iscritti            -> elenco completo
  *  GET    /api/admin/foto?key=<id>/<n>   -> immagine
- *  PATCH  /api/admin/iscritti?id=<id>    -> { stato, note, pagamento: {importo, metodo, data} | null }
+ *  PATCH  /api/admin/iscritti?id=<id>    -> { stato, note, pagamento: {importo, metodo, data} | null, postazione: {giorno, id|null} }
  *  DELETE /api/admin/iscritti?id=<id>    -> elimina iscrizione e foto
  *  POST   /api/admin/conferma?id=<id>     -> { giorni, quota, anteprima } invia email di pre-conferma
  *  POST   /api/admin/rifiuto?id=<id>      -> { messaggio, anteprima } invia email di non selezione
@@ -118,6 +119,7 @@ export default async (req) => {
       return json({ error: "Email non inviata: " + e.message }, 502);
     }
     rec.stato = "rifiutato";
+    delete rec.postazioni;
     rec.rifiutoInviato = new Date().toISOString();
     rec.aggiornato = rec.rifiutoInviato;
     await store.setJSON(key, rec);
@@ -129,6 +131,31 @@ export default async (req) => {
     if (body.stato !== undefined) {
       if (!STATI.includes(body.stato)) return json({ error: "Stato non valido" }, 400);
       rec.stato = body.stato;
+      // chi viene rifiutato o annullato libera la postazione
+      if (["rifiutato", "annullato", "in_attesa"].includes(rec.stato)) delete rec.postazioni;
+    }
+    if (body.postazione && typeof body.postazione === "object") {
+      const { giorno, id: pid } = body.postazione;
+      if (!(giorno in GIORNI)) return json({ error: "Giorno non valido" }, 400);
+      rec.postazioni = rec.postazioni || {};
+      if (pid === null || pid === "") {
+        delete rec.postazioni[giorno];
+      } else {
+        const layout = await leggiLayout();
+        if (!layout.postazioni.some((p) => p.id === pid)) return json({ error: "Postazione inesistente" }, 400);
+        if (!(rec.giorniConfermati || rec.giorni).includes(giorno)) return json({ error: "L'espositore non partecipa in questo giorno" }, 400);
+        // controllo che la postazione non sia già occupata quel giorno
+        const { blobs } = await store.list({ prefix: "iscritti/" });
+        for (const b of blobs) {
+          if (b.key === key) continue;
+          const altro = await store.get(b.key, { type: "json" });
+          if (altro?.postazioni?.[giorno] === pid) {
+            const lab = layout.postazioni.find((p) => p.id === pid)?.label;
+            return json({ error: `La postazione ${lab} è già assegnata a ${altro.nome} ${altro.cognome}` }, 409);
+          }
+        }
+        rec.postazioni[giorno] = pid;
+      }
     }
     if (typeof body.note === "string") rec.note = body.note.slice(0, 2000);
     if (body.pagamento === null) {
