@@ -94,6 +94,15 @@
 
 <main class="wrap">
 
+  <section class="avviso-lista" id="avvisoLista" hidden>
+    <h2>Iscrizioni chiuse · lista d'attesa</h2>
+    <p>Le postazioni disponibili sono state assegnate, ma puoi ancora candidarti: la tua richiesta entrerà in <strong>lista d'attesa</strong> e ti contatteremo via email se si libera un posto adatto alla tua merce.</p>
+  </section>
+  <section class="avviso-lista chiuso" id="avvisoChiuso" hidden>
+    <h2>Iscrizioni chiuse</h2>
+    <p>Le iscrizioni per i Mercatini di Natale 2026 sono chiuse. Grazie per l'interesse: ti aspettiamo alla prossima edizione!<br>Per informazioni: <a href="mailto:mercatinispinone@gmail.com">mercatinispinone@gmail.com</a></p>
+  </section>
+
   <section class="intro" id="intro">
     <span class="pill">Prima di procedere leggi attentamente</span>
     <h2>Candidati come espositore</h2>
@@ -272,10 +281,10 @@
 
   <section class="success" id="success">
     <svg width="64" height="64" style="color:var(--red);margin:0 auto" aria-hidden="true"><use href="#flake"/></svg>
-    <h2>Grazie! Richiesta ricevuta</h2>
+    <h2 id="successTit">Grazie! Richiesta ricevuta</h2>
     <div class="badge" id="successNum"></div>
     <p id="successMsg">Ti abbiamo inviato un'email con il riepilogo della tua richiesta.</p>
-    <p>L'organizzazione valuterà le candidature e ti scriverà sia in caso di conferma che di rifiuto.<br>A presto in riva al lago!</p>
+    <p id="successDopo">L'organizzazione valuterà le candidature e ti scriverà sia in caso di conferma che di rifiuto.<br>A presto in riva al lago!</p>
   </section>
 </main>
 

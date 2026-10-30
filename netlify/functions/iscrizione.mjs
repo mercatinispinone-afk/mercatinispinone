@@ -1,6 +1,7 @@
 import { randomUUID, randomInt } from "node:crypto";
 import { iscrizioniStore, fotoStore, json, stimaQuota, GIORNI, TIPI } from "../lib/shared.mjs";
 import { inviaConfermaEspositore, inviaNotificaOrganizzatore } from "../lib/mailer.mjs";
+import { leggiConfig, statoIscrizioni, ATTIVE } from "../lib/config.mjs";
 
 const SI_NO = ["Sì", "No"];
 const MAX_FOTO = 5;
@@ -25,6 +26,15 @@ export default async (req, context) => {
 
   // Honeypot anti-spam: campo nascosto che gli umani lasciano vuoto
   if (body.sito_web) return json({ ok: true, codice: nuovoCodice() });
+
+  const store = iscrizioniStore();
+  // Iscrizioni chiuse? (data, numero massimo o chiusura manuale) -> lista d'attesa oppure rifiuto
+  const cfg = await leggiConfig();
+  const tutti = await Promise.all((await store.list({ prefix: "iscritti/" })).blobs.map((b) => store.get(b.key, { type: "json" })));
+  const statoIsc = statoIscrizioni(cfg, tutti.filter((x) => x && ATTIVE(x)).length);
+  if (!statoIsc.aperte && !statoIsc.lista) return json({ error: "Le iscrizioni sono chiuse. Per informazioni scrivi a mercatinispinone@gmail.com" }, 403);
+  const inLista = !statoIsc.aperte;
+  const posizioneLista = inLista ? tutti.filter((x) => x?.stato === "lista").length + 1 : null;
 
   const r = {
     nome: str(body.nome, 80),
@@ -73,8 +83,8 @@ export default async (req, context) => {
     fotoBuffers.push({ type: m[1], buf });
   }
 
-  const store = iscrizioniStore();
   const id = `${Date.now()}-${randomUUID().slice(0, 8)}`;
+
 
   // Numero progressivo
   const meta = (await store.get("_meta/contatore", { type: "json" })) || { n: 0 };
@@ -94,7 +104,7 @@ export default async (req, context) => {
     numero: String(meta.n).padStart(3, "0"), // solo per uso interno (area admin)
     codice: nuovoCodice(),
     creato: new Date().toISOString(),
-    stato: "in_attesa",
+    stato: inLista ? "lista" : "in_attesa",
     note: "",
     ...r,
     quotaStimata: stimaQuota({ tipo: r.tipo, giorni: r.giorni, corrente: r.corrente === "Sì" }),
@@ -107,7 +117,7 @@ export default async (req, context) => {
   // Email (un eventuale errore non annulla l'iscrizione)
   const siteUrl = process.env.URL || new URL(req.url).origin;
   try {
-    await inviaConfermaEspositore(record);
+    await inviaConfermaEspositore(record, { posizioneLista });
     record.emailInviata = true;
   } catch (e) {
     console.error("Errore invio email espositore:", e.message);
@@ -120,7 +130,7 @@ export default async (req, context) => {
   }
   await store.setJSON(`iscritti/${id}`, record);
 
-  return json({ ok: true, codice: record.codice, emailInviata: record.emailInviata });
+  return json({ ok: true, codice: record.codice, emailInviata: record.emailInviata, lista: inLista, posizione: posizioneLista });
 };
 
 export const config = { path: "/api/iscrizione" };

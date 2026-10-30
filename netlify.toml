@@ -20,6 +20,24 @@
   status = 200
 
 [[redirects]]
+  from = "/checkin"
+  to = "/checkin.html"
+  status = 200
+
+[[headers]]
+  for = "/checkin*"
+  [headers.values]
+    X-Robots-Tag = "noindex, nofollow"
+    Cache-Control = "no-store"
+
+[[redirects]]
   from = "/regolamento"
   to = "/regolamento.html"
   status = 200
+
+# moduli JavaScript (lettura planimetrie PDF)
+[[headers]]
+  for = "/vendor/*.mjs"
+  [headers.values]
+    Content-Type = "text/javascript; charset=utf-8"
+    Cache-Control = "public, max-age=604800"

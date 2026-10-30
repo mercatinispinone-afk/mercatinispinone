@@ -171,6 +171,10 @@
       form.hidden = true;
       $("#intro").hidden = true;
       $("#successNum").textContent = "Codice richiesta: " + data.codice;
+      if (data.lista) {
+        $("#successTit").textContent = "Sei in lista d'attesa";
+        $("#successDopo").innerHTML = "Ti scriveremo via email se si libera una postazione adatta alla tua merce.<br>Grazie per la pazienza!";
+      }
       if (data.emailInviata === false)
         $("#successMsg").textContent = "La richiesta è stata registrata, ma non siamo riusciti a inviarti l'email di riepilogo. Non preoccuparti: ti contatteremo noi.";
       $("#success").classList.add("show");
@@ -178,7 +182,25 @@
     } catch (err) {
       alertBox(err.message);
       btn.disabled = false;
-      btn.textContent = "Invia la richiesta";
+      btn.textContent = testoBottone;
     }
   });
+
+  /* ---------- Iscrizioni aperte / lista d'attesa / chiuse ---------- */
+  let testoBottone = "Invia la richiesta";
+  fetch("/api/stato-iscrizioni", { cache: "no-store" })
+    .then((r) => (r.ok ? r.json() : null))
+    .then((s) => {
+      if (!s || s.aperte) return;
+      if (s.lista) {
+        $("#avvisoLista").hidden = false;
+        testoBottone = "Entra in lista d'attesa";
+        $("#submitBtn").textContent = testoBottone;
+      } else {
+        $("#avvisoChiuso").hidden = false;
+        form.hidden = true;
+        $("#intro").hidden = true;
+      }
+    })
+    .catch(() => {});
 })();

@@ -64,10 +64,14 @@ Associazione sotto le Stelle · via Alla Fonte 5 · Spinone al Lago (BG) · <a s
 </td></tr></table></td></tr></table></body></html>`;
 }
 
-export async function inviaConfermaEspositore(r) {
+export async function inviaConfermaEspositore(r, { posizioneLista = null } = {}) {
+  const intro = posizioneLista
+    ? `<p>abbiamo ricevuto la tua richiesta di partecipazione ai Mercatini di Natale di Spinone al Lago, ${EVENTO.date}.</p>
+<div style="margin:0 0 14px;padding:12px 16px;background:#fde2bf;border-left:4px solid #f09a2e;border-radius:3px">Le iscrizioni ordinarie sono chiuse: la tua richiesta è stata inserita in <strong>lista d'attesa</strong>. Se si libera una postazione adatta alla tua merce ti scriveremo via email con le istruzioni per confermarla.</div>`
+    : `<p>abbiamo ricevuto la tua <strong>richiesta di partecipazione</strong> ai Mercatini di Natale di Spinone al Lago, ${EVENTO.date}.</p>
+<p>Ricorda che questa <strong>non è ancora una conferma</strong>: l'organizzazione valuterà le richieste in base alla tipologia merceologica e all'ordine di arrivo e ti scriverà via email sia in caso di accettazione sia di rifiuto. Insieme alla conferma riceverai le istruzioni per il pagamento della quota.</p>`;
   const corpo = `<p>Ciao ${esc(r.nome)},</p>
-<p>abbiamo ricevuto la tua <strong>richiesta di partecipazione</strong> ai Mercatini di Natale di Spinone al Lago, ${EVENTO.date}.</p>
-<p>Ricorda che questa <strong>non è ancora una conferma</strong>: l'organizzazione valuterà le richieste in base alla tipologia merceologica e all'ordine di arrivo e ti scriverà via email sia in caso di accettazione sia di rifiuto. Insieme alla conferma riceverai le istruzioni per il pagamento della quota.</p>
+${intro}
 <p style="margin:18px 0 6px;font-weight:bold;color:#5b1f24">Riepilogo della tua richiesta (codice ${esc(r.codice)})</p>
 <table cellpadding="0" cellspacing="0" style="width:100%;border-collapse:collapse;background:#fbf1d8;border-radius:4px">${riepilogoRighe(r)}</table>
 <p style="font-size:13px;color:#6b4a3a;margin-top:14px">La quota indicata è una stima calcolata sulle tue scelte; l'importo definitivo ti verrà comunicato con la conferma.</p>
@@ -77,8 +81,8 @@ export async function inviaConfermaEspositore(r) {
     from: from(),
     to: r.email,
     replyTo: EVENTO.contatto,
-    subject: "Richiesta ricevuta – Mercatini di Natale Spinone al Lago 5-6 dicembre 2026",
-    html: layout("Grazie, richiesta ricevuta!", corpo),
+    subject: posizioneLista ? "Sei in lista d'attesa – Mercatini di Natale Spinone al Lago 2026" : "Richiesta ricevuta – Mercatini di Natale Spinone al Lago 5-6 dicembre 2026",
+    html: layout(posizioneLista ? "Sei in lista d'attesa" : "Grazie, richiesta ricevuta!", corpo),
   });
 }
 
@@ -91,7 +95,7 @@ export async function inviaNotificaOrganizzatore(r, siteUrl) {
     from: from(),
     to,
     replyTo: r.email,
-    subject: `Nuovo espositore: ${r.nome} ${r.cognome} (${TIPI[r.tipo].slice(0, 2)} ${r.giorni.join("+")})`,
+    subject: `${r.stato === "lista" ? "[LISTA D'ATTESA] " : ""}Nuovo espositore: ${r.nome} ${r.cognome} (${TIPI[r.tipo].slice(0, 2)} ${r.giorni.join("+")})`,
     html: layout("Nuova iscrizione", corpo),
   });
 }
@@ -104,6 +108,7 @@ export function costruisciPreconferma(r, { giorni, quota }) {
   const p = (t) => `<p style="margin:0 0 12px">${t}</p>`;
   const corpo = [
     p(`Ciao ${esc(r.nome)},`),
+    r.stato === "lista" ? p(`<strong>buone notizie!</strong> Si è liberata una postazione e, scorrendo la lista d'attesa, possiamo proporla a te.`) : "",
     p(`la tua postazione è <strong>pre-confermata</strong> per:`),
     `<ul style="margin:0 0 14px;padding-left:20px;font-weight:bold;color:#5b1f24">${giorni
       .map((g) => `<li style="margin:2px 0">${GIORNI_MAIUSC[g]}</li>`)

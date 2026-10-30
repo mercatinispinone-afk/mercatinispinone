@@ -38,7 +38,7 @@ export function quotaSpazio(tipo, giorni) {
 }
 
 // accettato = pre-confermato (email inviata, in attesa di pagamento); confermato = pagamento ricevuto
-export const STATI = ["in_attesa", "accettato", "confermato", "rifiutato", "annullato"];
+export const STATI = ["in_attesa", "lista", "accettato", "confermato", "rifiutato", "annullato"];
 /** Scadenza pagamento: N giorni lavorativi dall'invio della pre-conferma (esclusi weekend e festivi nazionali) */
 const FESTIVI = ["01-01", "01-06", "04-25", "05-01", "06-02", "08-15", "11-01", "12-08", "12-25", "12-26"];
 export function scadenzaPagamento(iso, giorni = PAGAMENTO.giorniLavorativi) {

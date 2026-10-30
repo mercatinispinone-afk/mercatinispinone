@@ -1,15 +1,16 @@
 import { json, isAdmin } from "../lib/shared.mjs";
-import { mappaStore, leggiLayout, layoutDefault, LARGHEZZA, ALTEZZA } from "../lib/mappa.mjs";
+import { mappaStore, leggiLayout, layoutDefault, LARGHEZZA, ALTEZZA, SCALA_SCHEMA } from "../lib/mappa.mjs";
 
 /**
  * Mappa delle postazioni (area riservata)
  *  GET    /api/admin/mappa          -> layout { postazioni:[{id,label,x,y,tipo,corrente}], sfondo }
- *  PUT    /api/admin/mappa          -> salva layout
+ *  PUT    /api/admin/mappa          -> salva layout { postazioni, scala, scalaVerificata, corridoio }
  *  GET    /api/admin/mappa/sfondo   -> immagine della planimetria caricata
  *  PUT    /api/admin/mappa/sfondo   -> { data: "data:image/...;base64,..." } carica planimetria
  *  DELETE /api/admin/mappa/sfondo   -> torna alla mappa schematica
  */
-const MAX_SFONDO = 4 * 1024 * 1024;
+const MAX_SFONDO = 4.5 * 1024 * 1024;
+const num = (v, min, max, def) => { const n = Number(v); return Number.isFinite(n) ? Math.max(min, Math.min(max, n)) : def; };
 
 export default async (req) => {
   if (!process.env.ADMIN_PASSWORD) return json({ error: "ADMIN_PASSWORD non configurata su Netlify" }, 500);
@@ -33,8 +34,12 @@ export default async (req) => {
       await store.set("sfondo", buf, { metadata: { type: m[1] } });
       const vecchiaW = layout.sfondo?.w || LARGHEZZA, vecchiaH = layout.sfondo?.h || ALTEZZA;
       layout.sfondo = { type: m[1], w: Number(body.w) || LARGHEZZA, h: Number(body.h) || ALTEZZA, caricato: new Date().toISOString() };
-      // riporto le postazioni in proporzione sulla nuova immagine (poi si sistemano a mano)
+      // riporto le postazioni in proporzione sulla nuova immagine (poi si sistemano a mano);
+      // la scala va ritarata sulla planimetria: intanto la stimo in proporzione
+      const k = layout.sfondo.w / vecchiaW;
       layout.postazioni = layout.postazioni.map((p) => ({ ...p, x: Math.round((p.x / vecchiaW) * layout.sfondo.w), y: Math.round((p.y / vecchiaH) * layout.sfondo.h) }));
+      layout.scala = layout.scala ? layout.scala * k : null;
+      layout.scalaVerificata = false;
       await store.setJSON("layout", layout);
       return json({ ok: true, layout });
     }
@@ -43,6 +48,8 @@ export default async (req) => {
       const vw = layout.sfondo?.w || LARGHEZZA, vh = layout.sfondo?.h || ALTEZZA;
       layout.postazioni = layout.postazioni.map((p) => ({ ...p, x: Math.round((p.x / vw) * LARGHEZZA), y: Math.round((p.y / vh) * ALTEZZA) }));
       layout.sfondo = null;
+      layout.scala = SCALA_SCHEMA;
+      layout.scalaVerificata = false;
       await store.setJSON("layout", layout);
       return json({ ok: true, layout });
     }
@@ -54,7 +61,7 @@ export default async (req) => {
   if (req.method === "PUT") {
     const body = await req.json().catch(() => ({}));
     const attuale = await leggiLayout();
-    const lista = Array.isArray(body.postazioni) ? body.postazioni.slice(0, 300) : null;
+    const lista = Array.isArray(body.postazioni) ? body.postazioni.slice(0, 500) : null;
     if (!lista) return json({ error: "Layout non valido" }, 400);
     const ids = new Set();
     const postazioni = [];
@@ -65,13 +72,23 @@ export default async (req) => {
       postazioni.push({
         id,
         label: String(p.label || id).slice(0, 8),
-        x: Math.max(0, Math.min(attuale.sfondo?.w || LARGHEZZA, Number(p.x) || 0)),
-        y: Math.max(0, Math.min(attuale.sfondo?.h || ALTEZZA, Number(p.y) || 0)),
+        x: num(p.x, 0, attuale.sfondo?.w || LARGHEZZA, 0),
+        y: num(p.y, 0, attuale.sfondo?.h || ALTEZZA, 0),
+        w: num(p.w, 0.5, 30, 4),
+        h: num(p.h, 0.5, 30, 4),
+        rot: num(p.rot, -360, 360, 0),
         tipo: p.tipo === "asfalto" ? "asfalto" : "prato",
         corrente: !!p.corrente,
       });
     }
-    const layout = { ...attuale, postazioni, aggiornato: new Date().toISOString() };
+    const layout = {
+      ...attuale,
+      postazioni,
+      scala: body.scala === null ? null : num(body.scala, 0.01, 10000, attuale.scala),
+      scalaVerificata: body.scalaVerificata !== undefined ? !!body.scalaVerificata : attuale.scalaVerificata,
+      corridoio: num(body.corridoio, 0, 10, attuale.corridoio ?? 1),
+      aggiornato: new Date().toISOString(),
+    };
     await store.setJSON("layout", layout);
     return json({ ok: true, layout });
   }

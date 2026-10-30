@@ -315,3 +315,8 @@ footer a { color: var(--gold); }
 @media (max-width: 480px) {
   .ribbon { letter-spacing: .16em; padding: 7px 14px; max-width: calc(100% - 24px); }
 }
+
+.avviso-lista { background: #fde2bf; border-left: 6px solid var(--orange); border-radius: var(--radius); padding: 18px 20px; margin: 26px 0 0; }
+.avviso-lista h2 { margin: 0 0 6px; }
+.avviso-lista p { margin: 0; }
+.avviso-lista.chiuso { background: var(--paper); border-left-color: var(--red); margin-bottom: 26px; }

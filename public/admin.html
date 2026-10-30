@@ -70,13 +70,42 @@
   .conf iframe, #pFrame { width: 100%; height: 520px; border: 0; border-radius: var(--radius); margin-top: 12px; background: #f7e9c6; }
   .conf-no { border-left-color: var(--red); }
   [hidden] { display: none !important; }
+  .set-stato { font-weight: 800; margin: 0 0 10px; }
+  .set-stato.aperte { color: var(--ok); } .set-stato.lista { color: #b0650f; } .set-stato.chiuse { color: var(--red); }
+  select.stato.lista { background: #fde2bf; color: #7a4510; }
+  .tag.arr { background: #4f6b2c; color: #fff; }
   .tabs { display: flex; gap: 6px; margin: 0 0 12px; border-bottom: 3px solid var(--maroon); }
   .tab { font: inherit; font-family: var(--cond); text-transform: uppercase; letter-spacing: .04em; font-size: 16px; padding: 9px 16px; border: 0; border-radius: var(--radius) var(--radius) 0 0; background: #ead9b0; color: var(--maroon); cursor: pointer; }
   .tab.on { background: var(--maroon); color: var(--gold); }
   .seg { display: inline-flex; border: 2px solid var(--maroon); border-radius: var(--radius); overflow: hidden; }
   .seg button { font: inherit; font-weight: 800; padding: 7px 14px; border: 0; background: #fff; color: var(--maroon); cursor: pointer; }
   .seg button.on { background: var(--maroon); color: #fff; }
-  .mEditBar { background: #fbe7cf; padding: 8px; border-radius: var(--radius); }
+  .mEditBar { background: #fbe7cf; padding: 8px; border-radius: var(--radius); margin-bottom: 10px; }
+  .mtools { display: flex; flex-wrap: wrap; gap: 8px 14px; }
+  .mgrp { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 4px; background: #fffaf0; border-radius: var(--radius); padding: 4px 6px; }
+  .mgrp > b { font-family: var(--cond); text-transform: uppercase; font-weight: 500; font-size: 12px; color: var(--muted); margin-right: 2px; }
+  .mt { font: inherit; font-size: 13px; font-weight: 700; color: var(--maroon); background: #fff; border: 1.5px solid var(--line); border-radius: 5px; padding: 4px 8px; cursor: pointer; display: inline-flex; align-items: center; gap: 4px; }
+  .mt:hover { border-color: var(--maroon); }
+  .mt.on { background: var(--maroon); color: #fff; border-color: var(--maroon); }
+  .mt input { font: inherit; padding: 1px 4px; border: 1px solid var(--line); border-radius: 4px; }
+  .mstatus { display: flex; justify-content: space-between; gap: 10px; font-size: 13px; margin-top: 6px; min-height: 18px; }
+  #mTool { color: var(--red); font-weight: 800; }
+  #mSalvato { color: var(--muted); }
+  .mscala { font-size: 13px; margin: 0 0 8px; }
+  .mscala .warn { background: #fde2bf; color: #7a4510; border-radius: var(--radius); padding: 6px 10px; display: inline-block; }
+  .mscala .err { background: #f7d6d6; color: #8a1f22; border-radius: var(--radius); padding: 6px 10px; display: inline-block; font-weight: 700; }
+  .mcanvas { position: relative; }
+  .mzoom { position: absolute; right: 8px; top: 8px; display: flex; flex-direction: column; gap: 4px; }
+  .mzoom button { width: 32px; height: 32px; border-radius: 6px; border: 1.5px solid var(--line); background: #fffaf0; color: var(--maroon); font-size: 18px; font-weight: 800; cursor: pointer; }
+  #mSvg { aspect-ratio: 1000 / 736; max-height: 78vh; background: #efe6cf; cursor: grab; }
+  #mSvg.panning { cursor: grabbing; }
+  #mSvg.tool { cursor: crosshair; }
+  #mSvg .pst .ovl { fill: url(#hatch); pointer-events: none; }
+  .mrow { display: flex; gap: 6px; align-items: end; }
+  .mrow .mfld { flex: 1; }
+  .mkeys { font-size: 12px; color: var(--muted); line-height: 1.5; }
+  .mkeys kbd { background: #fff; border: 1px solid var(--line); border-radius: 3px; padding: 0 4px; font-size: 11px; }
+
   .mgrid { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 14px; align-items: start; }
   .mwrap { background: var(--paper); border-radius: var(--radius); padding: 8px; }
   #mSvg { width: 100%; height: auto; display: block; border-radius: 4px; user-select: none; touch-action: none; }
@@ -139,6 +168,7 @@
     <div id="topActions" hidden>
       <button class="btn small" id="openInv" style="background:var(--gold);color:var(--maroon)">📣 Invia invito</button>
       <button class="btn small" id="openCom" style="background:#fcf4df;color:var(--maroon)">✉ Scrivi agli espositori</button>
+      <button class="btn small" id="openSet" style="background:#fcf4df;color:var(--maroon)" title="Chiusura iscrizioni, lista d'attesa, check-in">⚙ Impostazioni</button>
       <button class="btn small secondary" id="reload">Aggiorna</button>
       <button class="btn small" id="logout" style="background:transparent;border:2px solid var(--cream-2)">Esci</button>
     </div>
@@ -168,7 +198,7 @@
       <input type="search" id="q" placeholder="Cerca nome, email, telefono, merce…">
       <select id="fTipo"><option value="">Tutti i tipi</option><option value="1">Tipo 1 · non alimentari</option><option value="2">Tipo 2 · alimentari confezionati</option><option value="3">Tipo 3 · consumo in loco</option></select>
       <select id="fGiorno"><option value="">Tutti i giorni</option><option value="sab">Sabato 5</option><option value="dom">Domenica 6</option><option value="both">Entrambi</option></select>
-      <select id="fStato"><option value="">Tutti gli stati</option><option value="in_attesa">In attesa</option><option value="accettato">Pre-confermati (da pagare)</option><option value="_scaduti">⏰ Pagamento scaduto</option><option value="confermato">Confermati (pagato)</option><option value="rifiutato">Rifiutati</option><option value="annullato">Annullati</option></select>
+      <select id="fStato"><option value="">Tutti gli stati</option><option value="in_attesa">In attesa</option><option value="lista">Lista d'attesa</option><option value="accettato">Pre-confermati (da pagare)</option><option value="_scaduti">⏰ Pagamento scaduto</option><option value="confermato">Confermati (pagato)</option><option value="rifiutato">Rifiutati</option><option value="annullato">Annullati</option></select>
       <span class="spacer"></span>
       <button class="btn small" id="solTutti" type="button" style="background:var(--orange);color:var(--maroon-2)" hidden></button>
       <button class="btn small" id="csv">⬇ Esporta CSV</button>
@@ -189,28 +219,51 @@
 
     <div id="vistaMappa" hidden>
       <div class="toolbar">
-        <span class="seg"><button class="mGiorno on" data-g="sab" type="button">Sabato 5</button><button class="mGiorno" data-g="dom" type="button">Domenica 6</button></span>
+        <span class="seg" id="mSegGiorno"><button class="mGiorno on" data-g="sab" type="button">Sabato 5</button><button class="mGiorno" data-g="dom" type="button">Domenica 6</button></span>
         <strong id="mConta" style="color:var(--maroon)"></strong>
         <span class="spacer"></span>
         <button class="btn small secondary" id="mCopia" type="button" hidden></button>
-        <button class="btn small ghost" id="mModifica" type="button">✏️ Modifica layout</button>
+        <button class="btn small ghost" id="mModifica" type="button">✏️ Modifica planimetria</button>
         <button class="btn small" id="mStampa" type="button">🖨 Stampa giorno</button>
       </div>
-      <div class="toolbar mEditBar" id="mEditBar" hidden>
-        <button class="btn small ghost mAdd" data-tipo="prato" type="button">+ Postazione prato</button>
-        <button class="btn small ghost mAdd" data-tipo="asfalto" type="button">+ Postazione asfalto</button>
-        <button class="btn small ghost" id="mRinumera" type="button">Rinumera</button>
-        <label class="btn small ghost" style="cursor:pointer">🖼 Carica planimetria<input type="file" id="mFile" accept="image/*" hidden></label>
-        <button class="btn small ghost" id="mSchema" type="button">Usa mappa schematica</button>
-        <span class="hint" id="mSalvato" style="margin:0"></span>
+      <div class="mEditBar" id="mEditBar" hidden>
+        <div class="mtools">
+          <span class="mgrp"><b>Aggiungi</b>
+            <button class="mt mAdd" data-tipo="prato" type="button" title="Postazione singola su prato (A)">＋ Prato</button>
+            <button class="mt mAdd" data-tipo="asfalto" type="button" title="Postazione singola su asfalto">＋ Asfalto</button>
+            <button class="mt" id="tFila" type="button" title="Clicca inizio e fine: crea una fila di postazioni (F)">⋯ Fila dritta</button>
+            <button class="mt" id="tArco" type="button" title="Clicca inizio, un punto a metà e fine: postazioni lungo una curva">◠ Fila ad arco</button>
+          </span>
+          <span class="mgrp"><b>Misure</b>
+            <button class="mt" id="tScala" type="button" title="Clicca due punti di cui conosci la distanza (S)">📏 Imposta scala</button>
+            <label class="mt" title="Spazio libero minimo tra due postazioni">Passaggio <input type="number" id="mCorr" min="0" max="10" step="0.5" style="width:56px"> m</label>
+          </span>
+          <span class="mgrp"><b>Strumenti</b>
+            <button class="mt" id="mUndo" type="button" title="Annulla (Ctrl+Z)">↶ Annulla</button>
+            <button class="mt" id="mRinumera" type="button">Rinumera</button>
+            <label class="mt" style="cursor:pointer" title="Immagine (JPG, PNG) o PDF">🖼 Carica planimetria<input type="file" id="mFile" accept="image/*,application/pdf,.pdf" hidden></label>
+            <button class="mt" id="mSchema" type="button">Mappa schematica</button>
+          </span>
+        </div>
+        <div class="mstatus"><span id="mTool"></span><span id="mSalvato"></span></div>
       </div>
+      <div class="mscala" id="mScalaInfo"></div>
       <div class="mgrid">
-        <div class="mwrap"><svg id="mSvg" xmlns="http://www.w3.org/2000/svg"></svg>
+        <div class="mwrap">
+          <div class="mcanvas">
+            <svg id="mSvg" xmlns="http://www.w3.org/2000/svg"></svg>
+            <div class="mzoom">
+              <button type="button" id="zIn" title="Ingrandisci">＋</button>
+              <button type="button" id="zOut" title="Riduci">－</button>
+              <button type="button" id="zFit" title="Adatta alla finestra">⤢</button>
+            </div>
+          </div>
           <div class="mlegenda">
             <span><i style="background:#fffaf0;border:2px solid #4f6b2c"></i>libera prato</span>
             <span><i style="background:#fffaf0;border:2px dashed #5a5650"></i>libera asfalto</span>
             <span><i style="background:#6b6a2c"></i>tipo 1</span><span><i style="background:#f09a2e"></i>tipo 2</span><span><i style="background:#a3222f"></i>tipo 3</span>
-            <span>⚡ corrente</span><span><i style="background:#fff;border:2px solid #d00"></i>richiesta non rispettata</span>
+            <span>⚡ corrente</span><span><i style="background:repeating-linear-gradient(45deg,#d00 0 3px,#fff 3px 6px)"></i>sovrapposta / senza passaggio</span>
+            <span class="hint" style="margin:0">Rotellina = zoom · trascina lo sfondo per spostarti</span>
           </div>
         </div>
         <aside class="mside">
@@ -379,6 +432,34 @@
         <button class="btn small" id="iSend" type="button">📣 Invia a tutti</button></span>
       </div>
     </div>
+  </div>
+</dialog>
+
+<dialog id="set" class="inv-dlg" style="max-width:640px">
+  <div class="dlg-head"><h2>Impostazioni</h2><button type="button" id="setClose" aria-label="Chiudi">×</button></div>
+  <div class="dlg-body">
+    <div class="inv-step">
+      <div class="conf-lbl">Chiusura iscrizioni</div>
+      <p class="set-stato" id="setStato"></p>
+      <div class="conf-grid">
+        <label class="mfld">Chiudi le iscrizioni il <input type="datetime-local" id="setData"></label>
+        <label class="mfld">Oppure al raggiungimento di <input type="number" id="setMax" min="0" placeholder="es. 40"> candidature</label>
+      </div>
+      <p class="hint" style="margin:4px 0 8px">Contano le candidature attive (in attesa, pre-confermati, confermati); rifiutati, annullati e lista d'attesa no. Lascia vuoto per non usare il limite.</p>
+      <label class="mfld">Dopo la chiusura
+        <select id="setDopo"><option value="lista">raccogli le nuove richieste in lista d'attesa</option><option value="chiuso">chiudi il modulo (nessuna nuova richiesta)</option></select></label>
+      <label class="conf-chk"><input type="checkbox" id="setForza"> Chiudi le iscrizioni adesso (a prescindere da data e numero)</label>
+    </div>
+    <div class="inv-step">
+      <div class="conf-lbl">Check-in del giorno</div>
+      <p class="hint">Lo staff apre la pagina di check-in dal telefono e inserisce il PIN (non serve la password dell'area riservata).</p>
+      <div class="conf-grid">
+        <label class="mfld">PIN staff <input type="text" id="setPin" maxlength="30" placeholder="es. 2026" autocomplete="off"></label>
+        <label class="mfld">Indirizzo della pagina <input type="text" id="setLink" readonly onclick="this.select()"></label>
+      </div>
+    </div>
+    <div class="conf-err" id="setErr"></div>
+    <div class="dlg-actions"><span class="hint" id="setOk" style="margin:0"></span><button class="btn small secondary" id="setSave" type="button">Salva impostazioni</button></div>
   </div>
 </dialog>
 

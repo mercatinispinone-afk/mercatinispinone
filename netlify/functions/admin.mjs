@@ -1,5 +1,6 @@
 import { iscrizioniStore, fotoStore, json, isAdmin, STATI, GIORNI, METODI_PAGAMENTO, ORE_SOLLECITO } from "../lib/shared.mjs";
 import { leggiLayout } from "../lib/mappa.mjs";
+import { leggiConfig, salvaConfig } from "../lib/config.mjs";
 import { costruisciPreconferma, inviaPreconferma, costruisciRifiuto, inviaRifiuto, costruisciSollecito, inviaSollecito, costruisciConfermaDefinitiva, inviaConfermaDefinitiva } from "../lib/mailer.mjs";
 
 /**
@@ -12,6 +13,7 @@ import { costruisciPreconferma, inviaPreconferma, costruisciRifiuto, inviaRifiut
  *  POST   /api/admin/rifiuto?id=<id>      -> { messaggio, anteprima } invia email di non selezione
  *  POST   /api/admin/sollecito?id=<id>    -> { anteprima } invia sollecito di pagamento (48 ore)
  *  POST   /api/admin/definitiva?id=<id>   -> { anteprima, importo } email di conferma definitiva (dopo il pagamento)
+ *  GET/PUT /api/admin/config              -> impostazioni iscrizioni (chiusura, lista d'attesa, PIN staff)
  */
 export default async (req) => {
   if (!process.env.ADMIN_PASSWORD) return json({ error: "ADMIN_PASSWORD non configurata su Netlify" }, 500);
@@ -28,6 +30,22 @@ export default async (req) => {
     return new Response(res.data, {
       headers: { "content-type": res.metadata?.type || "image/jpeg", "cache-control": "private, max-age=3600" },
     });
+  }
+
+  if (risorsa === "config") {
+    if (req.method === "GET") return json({ config: await leggiConfig() });
+    if (req.method === "PUT") {
+      const b = await req.json().catch(() => ({}));
+      const c = await leggiConfig();
+      if ("chiusura" in b) c.chiusura = b.chiusura && !isNaN(Date.parse(b.chiusura)) ? new Date(b.chiusura).toISOString() : null;
+      if ("maxCandidature" in b) c.maxCandidature = Number(b.maxCandidature) > 0 ? Math.floor(Number(b.maxCandidature)) : null;
+      if ("dopoChiusura" in b) c.dopoChiusura = b.dopoChiusura === "chiuso" ? "chiuso" : "lista";
+      if ("forzaChiusura" in b) c.forzaChiusura = !!b.forzaChiusura;
+      if ("pinStaff" in b) c.pinStaff = String(b.pinStaff || "").trim().slice(0, 30);
+      await salvaConfig(c);
+      return json({ ok: true, config: c });
+    }
+    return json({ error: "Metodo non consentito" }, 405);
   }
 
   if (!["iscritti", "conferma", "rifiuto", "sollecito", "definitiva"].includes(risorsa)) return json({ error: "Non trovato" }, 404);
@@ -195,4 +213,4 @@ export default async (req) => {
   return json({ error: "Metodo non consentito" }, 405);
 };
 
-export const config = { path: ["/api/admin/iscritti", "/api/admin/foto", "/api/admin/conferma", "/api/admin/rifiuto", "/api/admin/sollecito", "/api/admin/definitiva"] };
+export const config = { path: ["/api/admin/iscritti", "/api/admin/foto", "/api/admin/conferma", "/api/admin/rifiuto", "/api/admin/sollecito", "/api/admin/definitiva", "/api/admin/config"] };

@@ -14,7 +14,7 @@
     "3": "3) Alimentari per consumo diretto in loco",
   };
   const GIORNI = { sab: "Sab 5", dom: "Dom 6" };
-  const STATI = { in_attesa: "In attesa", accettato: "Pre-confermato", confermato: "Confermato ✓", rifiutato: "Rifiutato", annullato: "Annullato" };
+  const STATI = { in_attesa: "In attesa", lista: "Lista d'attesa", accettato: "Pre-confermato", confermato: "Confermato ✓", rifiutato: "Rifiutato", annullato: "Annullato" };
 
   /* Scadenze pagamento: 5 giorni lavorativi dalla pre-conferma, poi sollecito con 48 ore */
   const FESTIVI = ["01-01", "01-06", "04-25", "05-01", "06-02", "08-15", "11-01", "12-08", "12-25", "12-26"];
@@ -122,10 +122,11 @@
     const acc = dati.filter((r) => r.stato === "accettato");
     const conf = dati.filter((r) => r.stato === "confermato");
     const att = dati.filter((r) => r.stato === "in_attesa").length;
-    const incassato = dati.reduce((s, r) => s + (r.pagamento?.importo || 0), 0);
+    const nLista = dati.filter((r) => r.stato === "lista").length;
+    const incassato = dati.reduce((s, r) => s + (r.pagamento?.importo || 0) + (r.correnteInLoco?.sab?.importo || 0) + (r.correnteInLoco?.dom?.importo || 0), 0);
     const daIncassare = acc.reduce((s, r) => s + (r.quotaConfermata ?? r.quotaStimata), 0);
     $("#stats").innerHTML = `
-      <div class="stat"><div class="k">Iscritti</div><div class="v">${tot}</div><div class="s">${att} in attesa · ${acc.length} pre-conf. · ${conf.length} confermati</div></div>
+      <div class="stat"><div class="k">Iscritti</div><div class="v">${tot}</div><div class="s">${att} in attesa · ${acc.length} pre-conf. · ${conf.length} confermati${nLista ? ` · ${nLista} in lista` : ""}</div></div>
       <div class="stat"><div class="k">Sabato 5</div><div class="v">${sab}</div><div class="s">espositori</div></div>
       <div class="stat"><div class="k">Domenica 6</div><div class="v">${dom}</div><div class="s">espositori</div></div>
       <div class="stat"><div class="k">Per tipo</div><div class="v" style="font-size:22px">${per("1")} · ${per("2")} · ${per("3")}</div><div class="s">tipo 1 · 2 · 3</div></div>
@@ -147,7 +148,7 @@
         <td>${r.giorni.map((g) => `<span class="tag tg">${GIORNI[g]}</span>`).join("")}</td>
         <td class="sub">Gazebo: ${esc(r.gazebo)}<br>Corrente: ${esc(r.corrente)}<br>Asfalto: ${esc(r.asfalto)}${window.MA?.labelPostazioni ? window.MA.labelPostazioni(r) : ""}</td>
         <td><strong>${euro(r.quotaStimata)}</strong></td>
-        <td><select class="stato ${r.stato}" data-stato>${Object.entries(STATI).map(([k, v]) => `<option value="${k}" ${k === r.stato ? "selected" : ""}>${v}</option>`).join("")}</select>${r.stato === "accettato" ? `<div>${r.confermaInviata ? `<span class="tag ok" title="Pre-conferma inviata">✉ ${new Date(r.confermaInviata).toLocaleDateString("it-IT")}</span>` : ""}<button class="btn-pay" data-pay title="Registra il pagamento e conferma la postazione">€ Pagato?</button>${badgePagamento(r)}</div>` : ""}${r.stato === "confermato" && r.pagamento ? `<div><span class="tag paid" title="${esc(r.pagamento.metodo)}">€ ${esc(String(r.pagamento.importo))} · ${new Date(r.pagamento.data).toLocaleDateString("it-IT")}</span>${r.confermaDefinitivaInviata ? ` <span class="tag ok" title="Email di conferma definitiva inviata">✉</span>` : ""}</div>` : ""}${r.stato === "rifiutato" && r.rifiutoInviato ? `<div><span class="tag no" title="Email di non selezione inviata">✉ ${new Date(r.rifiutoInviato).toLocaleDateString("it-IT")}</span></div>` : ""}</td>
+        <td><select class="stato ${r.stato}" data-stato>${Object.entries(STATI).map(([k, v]) => `<option value="${k}" ${k === r.stato ? "selected" : ""}>${v}</option>`).join("")}</select>${r.stato === "accettato" ? `<div>${r.confermaInviata ? `<span class="tag ok" title="Pre-conferma inviata">✉ ${new Date(r.confermaInviata).toLocaleDateString("it-IT")}</span>` : ""}<button class="btn-pay" data-pay title="Registra il pagamento e conferma la postazione">€ Pagato?</button>${badgePagamento(r)}</div>` : ""}${r.stato === "confermato" && r.pagamento ? `<div><span class="tag paid" title="${esc(r.pagamento.metodo)}">€ ${esc(String(r.pagamento.importo))} · ${new Date(r.pagamento.data).toLocaleDateString("it-IT")}</span>${r.confermaDefinitivaInviata ? ` <span class="tag ok" title="Email di conferma definitiva inviata">✉</span>` : ""}</div>` : ""}${r.stato === "lista" ? `<div><span class="tag" style="background:#fde2bf;color:#7a4510" title="Posizione in lista d'attesa">#${posLista(r)} in lista</span></div>` : ""}${["sab", "dom"].filter((g) => r.checkin?.[g]).map((g) => `<div><span class="tag arr" title="Arrivato alle ${new Date(r.checkin[g].ora).toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit" })}">✓ arrivato ${g === "sab" ? "sab" : "dom"}</span></div>`).join("")}${r.stato === "rifiutato" && r.rifiutoInviato ? `<div><span class="tag no" title="Email di non selezione inviata">✉ ${new Date(r.rifiutoInviato).toLocaleDateString("it-IT")}</span></div>` : ""}</td>
         <td><button class="btn small ghost" data-open>Dettagli</button></td>
       </tr>`
       )
@@ -430,6 +431,20 @@
     catch (err) { erroreSol(err.message); }
     finally { btn.disabled = false; }
   };
+  /* ---------- Lista d'attesa ---------- */
+  const inLista = () => dati.filter((r) => r.stato === "lista").sort((a, b) => a.creato.localeCompare(b.creato));
+  function posLista(r) { return inLista().findIndex((x) => x.id === r.id) + 1; }
+  /** Dopo che si è liberato un posto, propone il subentro al primo della lista che partecipa negli stessi giorni */
+  function proponiSubentro(liberato) {
+    const giorni = liberato.giorniConfermati || liberato.giorni;
+    const lista = inLista();
+    if (!lista.length) return;
+    const primo = lista.find((r) => r.giorni.some((g) => giorni.includes(g))) || lista[0];
+    const TIPI_BREVI = { "1": "non alimentari", "2": "alimentari confezionati", "3": "consumo in loco" };
+    if (!confirm(`Si è liberato il posto di ${liberato.nome} ${liberato.cognome}.\n\nPrimo in lista d'attesa: ${primo.nome} ${primo.cognome}\n${TIPI_BREVI[primo.tipo]} · ${primo.descrizione.slice(0, 60)}\n\nVuoi proporgli il posto? (si apre la pre-conferma, con anteprima prima dell'invio)`)) return;
+    setTimeout(() => apri(primo.id, "accettato"), 50);
+  }
+
   $("#sAnnulla").onclick = async () => {
     const sp = statoPagamento(corrente);
     const avviso = sp?.tipo === "sollecitato" ? "\n\nAttenzione: le 48 ore del sollecito non sono ancora scadute." : "";
@@ -438,6 +453,7 @@
       const { iscritto } = await api(`/api/admin/iscritti?id=${encodeURIComponent(corrente.id)}`, { method: "PATCH", body: JSON.stringify({ stato: "annullato" }) });
       Object.assign(corrente, iscritto);
       dlg.close(); render();
+      proponiSubentro(corrente);
     } catch (err) { erroreSol(err.message); }
   };
   // Sollecito a tutti i pagamenti scaduti (non ancora sollecitati)
@@ -485,20 +501,24 @@
   };
   $("#rSend").onclick = async () => {
     if (!confirm(`Inviare l'email di non selezione a ${corrente.email}?`)) return;
+    const liberaPosto = ["accettato", "confermato"].includes(corrente.stato);
     const btn = $("#rSend");
     btn.disabled = true; const t = btn.textContent; btn.textContent = "Invio…";
     try {
       const { iscritto } = await api(`/api/admin/rifiuto?id=${encodeURIComponent(corrente.id)}`, { method: "POST", body: JSON.stringify({ messaggio: $("#rMsg").value }) });
       Object.assign(corrente, iscritto);
       render(); preparaRifiuto(corrente);
+      if (liberaPosto) { dlg.close(); proponiSubentro(corrente); }
     } catch (err) { erroreRif(err.message); }
     finally { btn.disabled = false; if (btn.textContent === "Invio…") btn.textContent = t; }
   };
   $("#rNoMail").onclick = async () => {
+    const liberaPosto = ["accettato", "confermato"].includes(corrente.stato);
     try {
       const { iscritto } = await api(`/api/admin/iscritti?id=${encodeURIComponent(corrente.id)}`, { method: "PATCH", body: JSON.stringify({ stato: "rifiutato" }) });
       Object.assign(corrente, iscritto);
       dlg.close(); render();
+      if (liberaPosto) proponiSubentro(corrente);
     } catch (err) { erroreRif(err.message); }
   };
 
@@ -556,6 +576,10 @@
       ["Postazione sabato", (r) => window.MA?.labelPlain?.(r, "sab") || ""],
       ["Postazione domenica", (r) => window.MA?.labelPlain?.(r, "dom") || ""],
       ["Email non selezione inviata", (r) => (r.rifiutoInviato ? data(r.rifiutoInviato) : "")],
+      ["Posizione lista d'attesa", (r) => (r.stato === "lista" ? posLista(r) : "")],
+      ["Arrivato sabato", (r) => (r.checkin?.sab ? new Date(r.checkin.sab.ora).toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit" }) : "")],
+      ["Arrivato domenica", (r) => (r.checkin?.dom ? new Date(r.checkin.dom.ora).toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit" }) : "")],
+      ["Corrente incassata in loco (€)", (r) => { const t = ["sab", "dom"].reduce((s, g) => s + (r.correnteInLoco?.[g]?.importo || 0), 0); return t ? t.toFixed(2).replace(".", ",") : ""; }],
       ["Note interne", (r) => r.note],
     ];
     const cell = (v) => {
@@ -798,6 +822,47 @@ Mercatini di Spinone al Lago`;
     if (!$("#iOgg").value.trim() || !$("#iTxt").value.trim()) return erroreInv("Scrivi oggetto e testo.");
     if (!confirm(modo === "invito" ? `Inviare l'invito a ${destinatari.length} destinatari?` : `Inviare questa comunicazione a ${destinatari.length} espositori?`)) return;
     await inviaLista([...destinatari], { registra: modo === "invito" });
+  };
+
+  /* ---------- Impostazioni: chiusura iscrizioni e check-in ---------- */
+  const setDlg = $("#set");
+  const pad = (n) => String(n).padStart(2, "0");
+  const perInput = (iso) => { if (!iso) return ""; const d = new Date(iso); return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`; };
+  function statoAttuale(c) {
+    const attive = dati.filter((r) => !["rifiutato", "annullato", "lista"].includes(r.stato)).length;
+    const scaduta = c.chiusura && Date.now() > new Date(c.chiusura).getTime();
+    const piena = c.maxCandidature > 0 && attive >= c.maxCandidature;
+    const conteggio = c.maxCandidature > 0 ? ` (${attive} su ${c.maxCandidature} candidature)` : ` (${attive} candidature attive)`;
+    if (!(c.forzaChiusura || scaduta || piena)) return ["aperte", "● Iscrizioni APERTE" + conteggio + (c.chiusura ? ` · chiusura prevista ${new Date(c.chiusura).toLocaleString("it-IT", { dateStyle: "medium", timeStyle: "short" })}` : "")];
+    return c.dopoChiusura === "lista" ? ["lista", "● Iscrizioni chiuse: le nuove richieste vanno in LISTA D'ATTESA" + conteggio] : ["chiuse", "● Iscrizioni CHIUSE: il modulo non accetta richieste" + conteggio];
+  }
+  function mostraStato(c) { const [cl, t] = statoAttuale(c); $("#setStato").className = "set-stato " + cl; $("#setStato").textContent = t; }
+  $("#openSet").onclick = async () => {
+    $("#setErr").classList.remove("show"); $("#setOk").textContent = "";
+    try {
+      const { config: c } = await api("/api/admin/config");
+      $("#setData").value = perInput(c.chiusura);
+      $("#setMax").value = c.maxCandidature || "";
+      $("#setDopo").value = c.dopoChiusura;
+      $("#setForza").checked = !!c.forzaChiusura;
+      $("#setPin").value = c.pinStaff || "";
+      $("#setLink").value = location.origin + "/checkin";
+      mostraStato(c);
+      setDlg.showModal();
+    } catch (err) { alert(err.message); }
+  };
+  $("#setClose").onclick = () => setDlg.close();
+  $("#setSave").onclick = async () => {
+    const pin = $("#setPin").value.trim();
+    if (pin && pin.length < 4) { const b = $("#setErr"); b.textContent = "Il PIN deve avere almeno 4 caratteri."; b.classList.add("show"); return; }
+    try {
+      const { config: c } = await api("/api/admin/config", { method: "PUT", body: JSON.stringify({
+        chiusura: $("#setData").value ? new Date($("#setData").value).toISOString() : null,
+        maxCandidature: $("#setMax").value, dopoChiusura: $("#setDopo").value, forzaChiusura: $("#setForza").checked, pinStaff: pin,
+      }) });
+      mostraStato(c); $("#setErr").classList.remove("show");
+      $("#setOk").textContent = "✓ Salvato";
+    } catch (err) { const b = $("#setErr"); b.textContent = err.message; b.classList.add("show"); }
   };
 
   // Interfaccia per il modulo postazioni (postazioni.js)
